@@ -24,7 +24,7 @@ impl PartialOrd for Card {
 impl Card {
     pub fn new(suit: CardSuit, value: usize) -> Card {
         if value > 14 {
-            panic!("Card value cannot be greater than 13!");
+            panic!("Card value cannot be greater than 14!");
         }
 
         let score = match suit {
@@ -68,7 +68,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "Card value cannot be greater than 14!")]
     fn cannot_create_card_with_value_greater_than_14() {
         Card::new(CardSuit::Spade, 15);
     }
