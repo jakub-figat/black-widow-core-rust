@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub enum CardSuit {
     Spade,
     Club,
@@ -8,7 +8,7 @@ pub enum CardSuit {
     Diamond
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub struct Card {
     suit: CardSuit,
     value: usize,
