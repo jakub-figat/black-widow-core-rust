@@ -6,4 +6,5 @@ edition = "2021"
 
 [dependencies]
 game = {path = "./game"}
+serde = { version = "1.0", features = ["derive"] }
 

@@ -5,11 +5,11 @@ use crate::error::{GameError, GameResult};
 
 #[derive(Debug, PartialEq)]
 pub struct CardExchangePayload {
-    pub cards_to_exchange: Vec<Card>
+    pub cards_to_exchange: HashSet<Card>
 }
 
 impl CardExchangePayload {
-    pub fn from_cards(cards: &[Card]) -> GameResult<CardExchangePayload> {
+    pub fn from_cards(cards: &HashSet<Card>) -> GameResult<CardExchangePayload> {
         if cards.len() != 3 {
             Err(
                 GameError::InvalidPayload(
@@ -18,12 +18,7 @@ impl CardExchangePayload {
             )?
         }
 
-        let mut cards_unique: HashSet<&Card> = HashSet::from_iter(cards.iter());
-        if cards_unique.len() != cards.len() {
-            Err(GameError::InvalidPayload("CardExchangePayload cards must be unique!".to_string()))?
-        }
-
-        Ok(CardExchangePayload {cards_to_exchange: cards.to_vec()})
+        Ok(CardExchangePayload {cards_to_exchange: cards.clone()})
     }
 }
 
@@ -34,12 +29,14 @@ mod tests {
 
     #[test]
     fn card_exchange_payload_from_cards_panics_when_there_arent_3_cards() {
-        let cards = vec![
-            Card::new(CardSuit::Spade, 2),
-            Card::new(CardSuit::Spade, 3),
-            Card::new(CardSuit::Spade, 4),
-            Card::new(CardSuit::Spade, 5)
-        ];
+        let cards = HashSet::from(
+            [
+                Card::new(CardSuit::Spade, 2),
+                Card::new(CardSuit::Spade, 3),
+                Card::new(CardSuit::Spade, 4),
+                Card::new(CardSuit::Spade, 5)
+            ]
+        );
 
         let result = CardExchangePayload::from_cards(&cards);
         assert_eq!(
@@ -50,24 +47,5 @@ mod tests {
                 )
             )
         )
-    }
-
-    #[test]
-    fn card_exchange_payload_from_cards_panics_when_cards_arent_unique() {
-        let cards = vec![
-            Card::new(CardSuit::Spade, 2),
-            Card::new(CardSuit::Spade, 3),
-            Card::new(CardSuit::Spade, 3)
-        ];
-
-        let result = CardExchangePayload::from_cards(&cards);
-        assert_eq!(
-            result,
-            Err(
-                GameError::InvalidPayload(
-                    "CardExchangePayload cards must be unique!".to_string()
-                )
-            )
-        );
     }
 }
