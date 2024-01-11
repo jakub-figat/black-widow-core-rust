@@ -1,9 +1,9 @@
 use crate::step::{
-    CardExchangeState, 
-    RoundInProgressState,
-    RoundFinishedState, 
     GameStep
 };
+use crate::step::card_exchange::CardExchangeState;
+use crate::step::round_finished::RoundFinishedState;
+use crate::step::round_in_progress::RoundInProgressState;
 
 
 pub struct Game {
@@ -67,7 +67,7 @@ pub enum GameState {
 }
 
 impl GameState {
-    fn get_initial_state(players: Vec<String>) -> GameState {
+    fn get_initial_state(players: &Vec<String>) -> GameState {
         GameState::CardExchange(GameStep::initialize_from_players(players))
     }
 }
