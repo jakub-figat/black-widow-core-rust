@@ -25,8 +25,8 @@ impl Display for CardSuit {
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub struct Card {
     pub(crate) suit: CardSuit,
-    value: usize,
-    score: usize
+    pub value: usize,
+    pub score: usize
 }
 
 impl Display for Card {

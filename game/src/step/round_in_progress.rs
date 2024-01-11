@@ -57,12 +57,57 @@ impl GameStep<RoundInProgressState> {
     }
 
     pub fn dispatch_payload(&mut self, payload: &PlaceCardPayload) {
-        // remove card from user deck
-        // place it on table
+        self.place_card(&payload.card);
 
-        // if there are 3 cards, calculate who gets the score assigned and pick him as next player
-        // switch player
+        if self.state.table_suit.is_none() {
+            self.state.table_suit = Some(payload.card.suit);
+        }
+
+        // if everyone has placed a card, calculate who gets the score assigned and pick him as next player
+        if self.state.cards_on_table.len() == 3 {
+            let scoring_player = self.get_scoring_player();
+            let score = self.get_total_score_of_cards_on_table();
+            *self.scores.entry(scoring_player.clone()).or_insert(0) += score;
+        }
+
+        self.prepare_table_for_next_turn();
     }
+
+    fn place_card(&mut self, card: &Card) {
+        let current_player = &self.state.current_player;
+        self.player_decks.get_mut(current_player).unwrap().remove(card);
+        self.state.cards_on_table.insert(current_player.clone(), card.clone());
+    }
+
+    fn get_scoring_player(&self) -> String {
+        self.state.cards_on_table.iter()
+            .filter(|(_, card)| card.suit == self.state.table_suit.unwrap())
+            .max_by_key(|(_ ,card)| card.value)
+            .unwrap()
+            .0
+            .clone()
+    }
+
+    fn get_total_score_of_cards_on_table(&self) -> usize {
+        self.state.cards_on_table.iter()
+            .map(|(_, card)| card.score)
+            .sum()
+    }
+
+    fn prepare_table_for_next_turn(&mut self) {
+        self.state.cards_on_table = HashMap::new();
+        self.state.table_suit = None;
+        self.state.current_player = self.player_to_player_map[&self.state.current_player].clone();
+    }
+
+    // TODO: implement those and write tests
+    // pub fn should_switch(&self) -> bool {
+    //
+    // }
+    
+    // pub fn to_round_finished(self) -> RoundFinishedState {
+    //
+    // }
 }
 
 
