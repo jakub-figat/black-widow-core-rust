@@ -1,5 +1,5 @@
 use std::collections::{HashMap, HashSet};
-use crate::card::{Card};
+use crate::card::{Card, CardSuit};
 use crate::error::{GameError, GameResult};
 
 pub mod card_exchange;
@@ -17,7 +17,7 @@ pub struct GameStep<T> {
 }
 
 impl<T> GameStep<T> {
-    fn check_player_has_card(&self, card: &Card, player: &str) -> GameResult<()> {
+    fn validate_player_has_card(&self, card: &Card, player: &str) -> GameResult<()> {
         if !&self.player_decks.get(player).unwrap().contains(card) {
             Err(
                 GameError::InvalidAction(
@@ -27,6 +27,17 @@ impl<T> GameStep<T> {
         }
 
         Ok(())
+    }
+
+    fn check_if_player_has_only_one_suit_remaining(&self, player: &str, suit: CardSuit) -> bool {
+        self.player_decks.get(player).unwrap().iter()
+            .all(|card| card.suit == suit)
+    }
+
+    fn check_if_player_has_suit(&self, player: &str, suit: CardSuit) -> bool {
+        self.player_decks.get(player).unwrap().iter()
+            .any(|card| card.suit == suit)
+
     }
 }
 
@@ -51,7 +62,7 @@ mod tests {
         let card = Card::new(Spade, 2);
 
         assert_eq!(
-            step.check_player_has_card(&card, &players[0]),
+            step.validate_player_has_card(&card, &players[0]),
             Err(
                 GameError::InvalidAction("Player 1 does not have a card SPADE_2".to_string())
             )
@@ -67,7 +78,7 @@ mod tests {
         step.player_decks.get_mut(&players[0]).unwrap().insert(card.clone());
 
         assert_eq!(
-            step.check_player_has_card(&card, &players[0]),
+            step.validate_player_has_card(&card, &players[0]),
             Ok(())
         );
     }

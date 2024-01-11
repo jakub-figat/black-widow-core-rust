@@ -24,8 +24,9 @@ impl GameStep<CardExchangeState> {
         }
     }
 
-    pub fn validate(
+    pub fn validate_payload(
         &self,
+        payload: &CardExchangePayload,
         player: &str,
     ) -> GameResult<()> {
         if self.state.cards_to_exchange.get(player).is_some() {
@@ -34,6 +35,10 @@ impl GameStep<CardExchangeState> {
                     format!("Player {} has already declared cards for exchange", player)
                 )
             )?
+        }
+
+        for card in &payload.cards_to_exchange {
+            self.validate_player_has_card(card, player)?
         }
 
         Ok(())
@@ -60,7 +65,7 @@ impl GameStep<CardExchangeState> {
 
         let state = RoundInProgressState {
             current_player: self.player_to_player_map.get(&player).unwrap().to_string(),
-            table_suit: Club,
+            table_suit: Some(Club),
             cards_on_table: HashMap::from([(player, starting_card)])
         };
 
@@ -148,9 +153,10 @@ mod tests {
         );
 
         step.state.cards_to_exchange.insert("1".to_string(), cards.clone());
+        let payload = CardExchangePayload::from_cards(&cards).unwrap();
 
         assert_eq!(
-            step.validate(&players[0]),
+            step.validate_payload(&payload, &players[0]),
             Err(
                 GameError::InvalidAction("Player 1 has already declared cards for exchange".to_string())
             )
@@ -237,6 +243,6 @@ mod tests {
         // during the exchange, it will get passed to player 2
         // player 2 placed club 3 automatically due to game rules, so player 3 is next
         assert_eq!(round_in_progress_step.state.current_player, "3".to_string());
-        assert_eq!(round_in_progress_step.state.table_suit, Club);
+        assert_eq!(round_in_progress_step.state.table_suit, Some(Club));
     }
 }
