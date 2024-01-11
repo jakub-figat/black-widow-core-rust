@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use crate::card::Card;
 use crate::card::CardSuit::Club;
+use crate::error::GameError;
 
 pub fn pick_player_with_starting_card(
     player_decks: &HashMap<String, HashSet<Card>>

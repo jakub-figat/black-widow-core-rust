@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use crate::card::Card;
 use crate::card::CardSuit::Club;
-use crate::error::GameError;
+use crate::error::{GameError, GameResult};
 use crate::helper::{get_player_to_player_map, pick_player_with_starting_card};
 use crate::payload::CardExchangePayload;
 use crate::step::GameStep;
@@ -12,6 +12,7 @@ impl GameStep<CardExchangeState> {
     pub fn initialize_from_players(players: &Vec<String>) -> GameStep<CardExchangeState> {
         GameStep {
             players: players.clone(),
+            player_to_player_map: get_player_to_player_map(&players),
             scores: HashMap::new(),
             player_decks: HashMap::from_iter(
                 players.iter()
@@ -23,27 +24,16 @@ impl GameStep<CardExchangeState> {
         }
     }
 
-    pub fn validate_payload(
+    pub fn validate(
         &self,
-        payload: &CardExchangePayload,
         player: &str,
-    ) -> Result<(), GameError> {
+    ) -> GameResult<()> {
         if self.state.cards_to_exchange.get(player).is_some() {
             Err(
                 GameError::InvalidAction(
                     format!("Player {} has already declared cards for exchange", player)
                 )
             )?
-        }
-
-        for card in &payload.cards_to_exchange {
-            if !&self.player_decks.get(player).unwrap().contains(card) {
-                Err(
-                    GameError::InvalidAction(
-                        format!("Player {} does not have a card", player)
-                    )
-                )?
-            }
         }
 
         Ok(())
@@ -67,16 +57,16 @@ impl GameStep<CardExchangeState> {
         self.exchange_cards_between_players();
 
         let (player, starting_card) = pick_player_with_starting_card(&self.player_decks).unwrap();
-        let player_to_player_map = get_player_to_player_map(&self.players);
 
         let state = RoundInProgressState {
-            current_player: player_to_player_map.get(&player).unwrap().to_string(),
+            current_player: self.player_to_player_map.get(&player).unwrap().to_string(),
             table_suit: Club,
             cards_on_table: HashMap::from([(player, starting_card)])
         };
 
         GameStep {
             players: self.players,
+            player_to_player_map: self.player_to_player_map,
             scores: self.scores,
             player_decks: self.player_decks,
             state
@@ -85,8 +75,7 @@ impl GameStep<CardExchangeState> {
 
     fn exchange_cards_between_players(&mut self) {
         let player_decks = &mut self.player_decks;
-        let player_to_player_map = get_player_to_player_map(&self.players);
-        for (from_player, to_player) in &player_to_player_map {
+        for (from_player, to_player) in &self.player_to_player_map {
             for card in &self.state.cards_to_exchange[from_player] {
                 player_decks.get_mut(from_player).unwrap().remove(card);
                 player_decks.get_mut(to_player).unwrap().insert(card.clone());
@@ -147,30 +136,6 @@ mod tests {
     }
 
     #[test]
-    fn validate_payload_returns_error_when_player_does_not_have_a_card() {
-        let players = get_players();
-        let step = GameStep::initialize_from_players(&players);
-
-
-        let cards = HashSet::from(
-            [
-                Card::new(Spade, 2),
-                Card::new(Spade, 3),
-                Card::new(Spade, 4)
-            ]
-        );
-
-        let payload = CardExchangePayload::from_cards(&cards).unwrap();
-
-        assert_eq!(
-            step.validate_payload(&payload, &players[0]),
-            Err(
-                GameError::InvalidAction("Player 1 does not have a card".to_string())
-            )
-        );
-    }
-
-    #[test]
     fn validate_payload_returns_error_when_player_already_placed_cards_for_exchange() {
         let players = get_players();
         let mut step = GameStep::initialize_from_players(&players);
@@ -183,10 +148,9 @@ mod tests {
         );
 
         step.state.cards_to_exchange.insert("1".to_string(), cards.clone());
-        let payload = CardExchangePayload::from_cards(&cards).unwrap();
 
         assert_eq!(
-            step.validate_payload(&payload, &players[0]),
+            step.validate(&players[0]),
             Err(
                 GameError::InvalidAction("Player 1 has already declared cards for exchange".to_string())
             )

@@ -22,6 +22,11 @@ impl CardExchangePayload {
     }
 }
 
+
+pub struct PlaceCardPayload {
+    pub card: Card
+}
+
 #[cfg(test)]
 mod tests {
     use crate::card::CardSuit;

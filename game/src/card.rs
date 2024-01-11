@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub enum CardSuit {
@@ -8,11 +9,38 @@ pub enum CardSuit {
     Diamond
 }
 
+impl Display for CardSuit {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        let name = match self {
+            CardSuit::Spade => "SPADE",
+            CardSuit::Club => "CLUB",
+            CardSuit::Heart => "HEART",
+            CardSuit::Diamond => "DIAMOND"
+        };
+        write!(f, "{}", name)
+    }
+}
+
+
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub struct Card {
     suit: CardSuit,
     value: usize,
     score: usize
+}
+
+impl Display for Card {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        let temp_other = self.value.to_string();
+;        let value = match self.value {
+            11 => "JACK",
+            12 => "QUEEN",
+            13 => "KING",
+            14 => "ACE",
+            other => temp_other.as_str()
+        };
+        write!(f, "{}_{}", &self.suit, value)
+    }
 }
 
 impl PartialOrd for Card {

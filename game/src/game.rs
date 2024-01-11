@@ -61,7 +61,6 @@ pub struct GameSettings {
 
 pub enum GameState {
     CardExchange(GameStep<CardExchangeState>),
-    FirstRound(GameStep<RoundInProgressState>),
     RoundInProgress(GameStep<RoundInProgressState>),
     RoundFinished(GameStep<RoundFinishedState>)
 }
