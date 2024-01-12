@@ -1,7 +1,8 @@
 use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
+use serde::Deserialize;
 
-#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Deserialize)]
 pub enum CardSuit {
     Spade,
     Club,
@@ -22,9 +23,9 @@ impl Display for CardSuit {
 }
 
 
-#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Deserialize)]
 pub struct Card {
-    pub(crate) suit: CardSuit,
+    pub suit: CardSuit,
     pub value: usize,
     pub score: usize
 }

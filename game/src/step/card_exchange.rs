@@ -19,7 +19,7 @@ impl GameStep<CardExchangeState> {
         }
     }
 
-    pub(crate) fn empty_from_players(players: &Vec<String>) -> GameStep<CardExchangeState> {
+    pub fn empty_from_players(players: &Vec<String>) -> GameStep<CardExchangeState> {
         GameStep {
             players: players.clone(),
             player_to_player_map: get_player_to_player_map(&players),
@@ -99,7 +99,7 @@ impl GameStep<CardExchangeState> {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct CardExchangeState {
     pub cards_to_exchange: HashMap<String, HashSet<Card>>
 }

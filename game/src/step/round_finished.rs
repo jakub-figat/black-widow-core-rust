@@ -38,7 +38,7 @@ impl GameStep<RoundFinishedState> {
 
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RoundFinishedState {
     pub players_ready: HashSet<String>
 }

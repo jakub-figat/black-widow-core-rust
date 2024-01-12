@@ -120,7 +120,7 @@ impl GameStep<RoundInProgressState> {
 }
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RoundInProgressState {
     pub current_player: String,
     pub table_suit: Option<CardSuit>,

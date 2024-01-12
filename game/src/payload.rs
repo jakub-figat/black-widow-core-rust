@@ -1,9 +1,10 @@
 use std::collections::HashSet;
+use serde::Deserialize;
 use crate::card::Card;
 use crate::error::{GameError, GameResult};
 
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Deserialize)]
 pub struct CardExchangePayload {
     pub cards_to_exchange: HashSet<Card>
 }
@@ -23,6 +24,7 @@ impl CardExchangePayload {
 }
 
 
+#[derive(Deserialize)]
 pub struct PlaceCardPayload {
     pub card: Card
 }

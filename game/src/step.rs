@@ -7,7 +7,7 @@ pub mod round_in_progress;
 pub mod round_finished;
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct GameStep<T> {
     players: Vec<String>,
     player_to_player_map: HashMap<String, String>,
@@ -45,8 +45,6 @@ impl<T> GameStep<T> {
 #[cfg(test)]
 mod tests {
     use crate::card::CardSuit::Spade;
-    use crate::helper::get_player_to_player_map;
-    use crate::step::card_exchange::CardExchangeState;
     use super::*;
 
     fn get_players() -> Vec<String> {
