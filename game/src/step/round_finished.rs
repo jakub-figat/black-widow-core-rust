@@ -38,8 +38,64 @@ impl GameStep<RoundFinishedState> {
 
 }
 
+#[derive(Debug)]
 pub struct RoundFinishedState {
     pub players_ready: HashSet<String>
 }
 
-impl RoundFinishedState {}
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+    use crate::helper::get_player_to_player_map;
+    use super::*;
+
+    fn get_step() -> GameStep<RoundFinishedState> {
+        let players = vec![
+            "1".to_string(),
+            "2".to_string(),
+            "3".to_string(),
+        ];
+        GameStep {
+            players: players.clone(),
+            player_to_player_map: get_player_to_player_map(&players),
+            scores: HashMap::new(),
+            player_decks: HashMap::new(),
+            state: RoundFinishedState {players_ready: HashSet::new()}
+        }
+    }
+
+    #[test]
+    fn claim_readiness() {
+        let mut step = get_step();
+        let result = step.claim_readiness("1");
+
+        assert!(result.is_ok());
+        assert_eq!(step.state.players_ready.len(), 1);
+    }
+
+    #[test]
+    fn claim_readiness_when_already_claimed() {
+        let mut step = get_step();
+        step.state.players_ready.insert("1".to_string());
+        let result = step.claim_readiness("1");
+
+        assert_eq!(result, Err(GameError::InvalidAction("Player 1 has already claimed readiness".to_string())));
+        assert_eq!(step.state.players_ready.len(), 1);
+    }
+
+    #[test]
+    fn game_finished_when_one_of_players_has_score_equal_or_more_than_100() {
+        let mut step = get_step();
+        step.scores.insert("1".to_string(), 100);
+
+        assert!(step.game_finished());
+    }
+
+    #[test]
+    fn game_finished_when_one_of_players_has_score_less_than_100() {
+        let mut step = get_step();
+        step.scores.insert("1".to_string(), 99);
+
+        assert!(!step.game_finished());
+    }
+}
