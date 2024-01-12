@@ -45,6 +45,8 @@ impl<T> GameStep<T> {
 #[cfg(test)]
 mod tests {
     use crate::card::CardSuit::Spade;
+    use crate::helper::get_player_to_player_map;
+    use crate::step::card_exchange::CardExchangeState;
     use super::*;
 
     fn get_players() -> Vec<String> {
@@ -58,7 +60,7 @@ mod tests {
     #[test]
     fn player_does_not_have_a_card_when_player_does_not_have_a_card() {
         let players = get_players();
-        let step = GameStep::initialize_from_players(&players);
+        let step = GameStep::empty_from_players(&players);
         let card = Card::new(Spade, 2);
 
         assert_eq!(
@@ -72,7 +74,7 @@ mod tests {
     #[test]
     fn player_does_not_have_a_card_when_player_has_a_card() {
         let players = get_players();
-        let mut step = GameStep::initialize_from_players(&players);
+        let mut step = GameStep::empty_from_players(&players);
         let card = Card::new(Spade, 2);
 
         step.player_decks.get_mut(&players[0]).unwrap().insert(card.clone());

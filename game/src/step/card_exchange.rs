@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use crate::card::Card;
 use crate::card::CardSuit::Club;
 use crate::error::{GameError, GameResult};
-use crate::helper::{get_player_to_player_map, pick_player_with_starting_card};
+use crate::helper::{get_player_to_player_map, get_starting_player_decks, pick_player_with_starting_card};
 use crate::payload::CardExchangePayload;
 use crate::step::GameStep;
 use crate::step::round_in_progress::RoundInProgressState;
@@ -10,6 +10,16 @@ use crate::step::round_in_progress::RoundInProgressState;
 
 impl GameStep<CardExchangeState> {
     pub fn initialize_from_players(players: &Vec<String>) -> GameStep<CardExchangeState> {
+        GameStep {
+            players: players.clone(),
+            player_to_player_map: get_player_to_player_map(&players),
+            scores: HashMap::new(),
+            player_decks: get_starting_player_decks(&players),
+            state: CardExchangeState::new()
+        }
+    }
+
+    pub(crate) fn empty_from_players(players: &Vec<String>) -> GameStep<CardExchangeState> {
         GameStep {
             players: players.clone(),
             player_to_player_map: get_player_to_player_map(&players),
@@ -143,7 +153,7 @@ mod tests {
     #[test]
     fn validate_payload_returns_error_when_player_already_placed_cards_for_exchange() {
         let players = get_players();
-        let mut step = GameStep::initialize_from_players(&players);
+        let mut step = GameStep::empty_from_players(&players);
         let cards = HashSet::from(
             [
                 Card::new(Spade, 2),
@@ -174,7 +184,7 @@ mod tests {
             ]
         );
         let payload = CardExchangePayload::from_cards(&cards).unwrap();
-        let mut step = GameStep::initialize_from_players(&players);
+        let mut step = GameStep::empty_from_players(&players);
         step.dispatch_payload(&payload, &players[0]);
 
         assert_eq!(
@@ -192,7 +202,7 @@ mod tests {
         let players = get_players();
         let vec_of_cards = get_decks_of_three_cards();
         
-        let mut step = GameStep::initialize_from_players(&players);
+        let mut step = GameStep::empty_from_players(&players);
         insert_decks_of_cards(&mut step, &vec_of_cards);
 
         step.state.cards_to_exchange.insert("1".to_string(), vec_of_cards[0].clone());
@@ -207,7 +217,7 @@ mod tests {
         let players = get_players();
         let vec_of_cards = get_decks_of_three_cards();
 
-        let mut step = GameStep::initialize_from_players(&players);
+        let mut step = GameStep::empty_from_players(&players);
         insert_decks_of_cards(&mut step, &vec_of_cards);
 
         step.state.cards_to_exchange.insert("1".to_string(), vec_of_cards[0].clone());
@@ -230,7 +240,7 @@ mod tests {
         let players = get_players();
         let vec_of_cards = get_decks_of_three_cards();
 
-        let mut step = GameStep::initialize_from_players(&players);
+        let mut step = GameStep::empty_from_players(&players);
         insert_decks_of_cards(&mut step, &vec_of_cards);
 
         step.state.cards_to_exchange.insert("1".to_string(), vec_of_cards[0].clone());

@@ -1,8 +1,10 @@
+use rand::seq::SliceRandom;
+use rand::thread_rng;
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use crate::card::Card;
-use crate::card::CardSuit::Club;
-use crate::error::GameError;
+use crate::card::CardSuit::{Club, Diamond, Heart, Spade};
+
 
 pub fn pick_player_with_starting_card(
     player_decks: &HashMap<String, HashSet<Card>>
@@ -29,6 +31,32 @@ pub fn get_player_to_player_map(players: &[String]) -> HashMap<String, String> {
             .map(|(i, player)| (player.clone(), players[(i+1) % players.len()].clone()))
             .collect::<HashMap<_, _>>()
     )
+}
+
+pub fn get_starting_player_decks(players: &[String]) -> HashMap<String, HashSet<Card>> {
+    let mut player_decks = HashMap::new();
+    let mut all_cards = HashSet::new();
+
+    for card_suit in [Spade, Heart, Club, Diamond] {
+        for value in 2..=14 {
+            all_cards.insert(Card::new(card_suit, value));
+        }
+    }
+
+    if players.len() == 3 {
+        all_cards.remove(&Card::new(Club, 2));
+    }
+    let mut all_cards = Vec::from_iter(all_cards.iter().cloned());
+
+    let mut rng = thread_rng();
+    all_cards.shuffle(&mut rng);
+
+    for (i, &card) in all_cards.iter().enumerate() {
+        let player = players[i % players.len()].clone();
+        player_decks.entry(player).or_insert(HashSet::new()).insert(card);
+    }
+
+    player_decks
 }
 
 #[cfg(test)]
@@ -128,5 +156,37 @@ mod tests {
         );
 
         assert_eq!(get_player_to_player_map(&players), expected_map)
+    }
+
+    #[test]
+    fn get_starting_player_decks_for_3_players() {
+        let players = vec![
+            "1".to_string(),
+            "2".to_string(),
+            "3".to_string(),
+        ];
+
+        let player_decks = get_starting_player_decks(&players);
+        assert_eq!(player_decks.len(), 3);
+        assert_eq!(player_decks["1"].len(), 17);
+        assert_eq!(player_decks["1"].len(), 17);
+        assert_eq!(player_decks["1"].len(), 17);
+    }
+
+    #[test]
+    fn get_starting_player_decks_for_4_players() {
+        let players = vec![
+            "1".to_string(),
+            "2".to_string(),
+            "3".to_string(),
+            "4".to_string(),
+        ];
+
+        let player_decks = get_starting_player_decks(&players);
+        assert_eq!(player_decks.len(), 4);
+        assert_eq!(player_decks["1"].len(), 13);
+        assert_eq!(player_decks["1"].len(), 13);
+        assert_eq!(player_decks["1"].len(), 13);
+        assert_eq!(player_decks["1"].len(), 13);
     }
 }

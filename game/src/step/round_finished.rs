@@ -22,8 +22,8 @@ impl GameStep<RoundFinishedState> {
         self.state.players_ready.len() == self.players.len()
     }
 
-    pub fn game_finished(&self) -> bool {
-        self.scores.iter().max_by_key(|(_, &score)| score).unwrap().1.clone() >= 100
+    pub fn game_finished(&self, max_score: usize) -> bool {
+        self.scores.iter().max_by_key(|(_, &score)| score).unwrap().1.clone() >= max_score
     }
 
     pub fn to_card_exchange(self) -> GameStep<CardExchangeState> {
@@ -88,7 +88,7 @@ mod tests {
         let mut step = get_step();
         step.scores.insert("1".to_string(), 100);
 
-        assert!(step.game_finished());
+        assert!(step.game_finished(100));
     }
 
     #[test]
@@ -96,6 +96,6 @@ mod tests {
         let mut step = get_step();
         step.scores.insert("1".to_string(), 99);
 
-        assert!(!step.game_finished());
+        assert!(!step.game_finished(100));
     }
 }
