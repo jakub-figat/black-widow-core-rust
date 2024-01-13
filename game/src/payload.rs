@@ -29,6 +29,11 @@ pub struct PlaceCardPayload {
     pub card: Card
 }
 
+#[derive(Deserialize)]
+pub struct ClaimReadinessPayload {
+    pub ready: bool
+}
+
 #[cfg(test)]
 mod tests {
     use crate::card::CardSuit;

@@ -3,28 +3,11 @@ use crate::card::{Card, CardSuit};
 use crate::card::CardSuit::Heart;
 use crate::error::{GameError, GameResult};
 use crate::payload::PlaceCardPayload;
+use crate::r#trait::PayloadHandler;
 use crate::step::GameStep;
 use crate::step::round_finished::RoundFinishedState;
 
 impl GameStep<RoundInProgressState> {
-    pub fn validate_payload(&self, payload: &PlaceCardPayload) -> GameResult<()> {
-        let player = &self.state.current_player;
-        self.validate_player_has_card(&payload.card, &self.state.current_player)?;
-
-        match self.state.table_suit {
-            Some(table_suit) => {
-                self.validate_placed_suit(payload.card.suit, table_suit, player)
-            }
-            None => {
-                if payload.card.suit == Heart {
-                    self.validate_only_heart_left(player)?
-                }
-
-                Ok(())
-            }
-        }
-    }
-
     fn validate_placed_suit(&self, placed_suit: CardSuit, table_suit: CardSuit, player: &str) -> GameResult<()> {
         if placed_suit != table_suit && self.check_if_player_has_suit(player, table_suit) {
             Err(
@@ -55,20 +38,6 @@ impl GameStep<RoundInProgressState> {
         }
 
         Ok(())
-    }
-
-    pub fn dispatch_payload(&mut self, payload: &PlaceCardPayload) {
-        self.place_card(&payload.card);
-
-        if self.state.table_suit.is_none() {
-            self.state.table_suit = Some(payload.card.suit);
-        }
-
-        if self.state.cards_on_table.len() == self.players.len() {
-            self.prepare_table_for_next_turn();
-        } else {
-            self.state.current_player = self.player_to_player_map[&self.state.current_player].clone();
-        }
     }
 
     fn place_card(&mut self, card: &Card) {
@@ -114,7 +83,40 @@ impl GameStep<RoundInProgressState> {
             player_to_player_map: self.player_to_player_map,
             scores: self.scores,
             player_decks: self.player_decks,
-            state: RoundFinishedState { players_ready: HashSet::new()}
+            state: RoundFinishedState { players_ready: HashMap::new()}
+        }
+    }
+}
+
+impl PayloadHandler<'_, PlaceCardPayload> for GameStep<RoundInProgressState> {
+    fn validate_payload(&self, payload: &PlaceCardPayload, player: &str) -> GameResult<()> {
+        self.validate_player_has_card(&payload.card, &self.state.current_player)?;
+
+        match self.state.table_suit {
+            Some(table_suit) => {
+                self.validate_placed_suit(payload.card.suit, table_suit, player)
+            }
+            None => {
+                if payload.card.suit == Heart {
+                    self.validate_only_heart_left(player)?
+                }
+
+                Ok(())
+            }
+        }
+    }
+
+    fn dispatch_payload(&mut self, payload: &PlaceCardPayload,  player: &str) {
+        self.place_card(&payload.card);
+
+        if self.state.table_suit.is_none() {
+            self.state.table_suit = Some(payload.card.suit);
+        }
+
+        if self.state.cards_on_table.len() == self.players.len() {
+            self.prepare_table_for_next_turn();
+        } else {
+            self.state.current_player = self.player_to_player_map[player].clone();
         }
     }
 }
@@ -170,7 +172,7 @@ mod tests {
         step.player_decks.get_mut(&players[0]).unwrap().insert(card.clone());
         let payload = PlaceCardPayload {card};
 
-        assert!(step.validate_payload(&payload).is_ok());
+        assert!(step.validate_payload(&payload, &players[0]).is_ok());
     }
 
     #[test]
@@ -191,7 +193,7 @@ mod tests {
                 "Player 1 tried to place DIAMOND, despite having SPADE in deck".to_string()
             )
         );
-        assert_eq!(step.validate_payload(&payload), expected_error);
+        assert_eq!(step.validate_payload(&payload, &players[0]), expected_error);
     }
 
     #[test]
@@ -204,7 +206,7 @@ mod tests {
         step.player_decks.get_mut(&players[0]).unwrap().insert(card.clone());
 
         let payload = PlaceCardPayload {card};
-        assert!(step.validate_payload(&payload).is_ok());
+        assert!(step.validate_payload(&payload, &players[0]).is_ok());
     }
 
     #[test]
@@ -222,7 +224,7 @@ mod tests {
                 "Player 1 tried to place Heart suit on the table, despite having other suits left".to_string()
             )
         );
-        assert_eq!(step.validate_payload(&payload), expected_error);
+        assert_eq!(step.validate_payload(&payload, &players[0]), expected_error);
     }
 
     #[test]
@@ -234,7 +236,7 @@ mod tests {
         step.player_decks.get_mut(&players[0]).unwrap().insert(card.clone());
         let payload = PlaceCardPayload {card};
 
-        assert!(step.validate_payload(&payload).is_ok());
+        assert!(step.validate_payload(&payload, &players[0]).is_ok());
     }
 
     #[test]
@@ -246,7 +248,7 @@ mod tests {
         step.player_decks.get_mut(&players[0]).unwrap().insert(card.clone());
         let payload = PlaceCardPayload {card};
 
-        assert!(step.validate_payload(&payload).is_ok());
+        assert!(step.validate_payload(&payload, &players[0]).is_ok());
     }
 
     #[test]
@@ -264,9 +266,9 @@ mod tests {
             ]
         );
 
-        step.dispatch_payload(&PlaceCardPayload {card: card_1});
-        step.dispatch_payload(&PlaceCardPayload {card: card_2});
-        step.dispatch_payload(&PlaceCardPayload {card: card_3});
+        step.dispatch_payload(&PlaceCardPayload {card: card_1}, &players[0]);
+        step.dispatch_payload(&PlaceCardPayload {card: card_2}, &players[1]);
+        step.dispatch_payload(&PlaceCardPayload {card: card_3}, &players[2]);
 
         assert_eq!(&step.state.current_player, "2");
         assert_eq!(step.scores, HashMap::from([("2".to_string(), 13)]));

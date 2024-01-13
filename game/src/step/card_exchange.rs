@@ -1,9 +1,13 @@
 use std::collections::{HashMap, HashSet};
+use std::error::Error;
 use crate::card::Card;
 use crate::card::CardSuit::Club;
 use crate::error::{GameError, GameResult};
+use crate::game::GameState;
+use crate::game::GameState::{CardExchange, RoundInProgress};
 use crate::helper::{get_player_to_player_map, get_starting_player_decks, pick_player_with_starting_card};
 use crate::payload::CardExchangePayload;
+use crate::r#trait::PayloadHandler;
 use crate::step::GameStep;
 use crate::step::round_in_progress::RoundInProgressState;
 
@@ -32,36 +36,6 @@ impl GameStep<CardExchangeState> {
             ),
             state: CardExchangeState::new()
         }
-    }
-
-    pub fn validate_payload(
-        &self,
-        payload: &CardExchangePayload,
-        player: &str,
-    ) -> GameResult<()> {
-        if self.state.cards_to_exchange.get(player).is_some() {
-            Err(
-                GameError::InvalidAction(
-                    format!("Player {} has already declared cards for exchange", player)
-                )
-            )?
-        }
-
-        for card in &payload.cards_to_exchange {
-            self.validate_player_has_card(card, player)?
-        }
-
-        Ok(())
-    }
-
-    pub fn dispatch_payload(
-        &mut self,
-        payload: &CardExchangePayload,
-        player: &str
-    ) {
-        self.state.cards_to_exchange.insert(
-            player.to_string(), payload.cards_to_exchange.clone()
-        );
     }
 
     pub fn should_switch(&self) -> bool {
@@ -96,6 +70,38 @@ impl GameStep<CardExchangeState> {
                 player_decks.get_mut(to_player).unwrap().insert(card.clone());
             }
         }
+    }
+}
+
+impl PayloadHandler<'_, CardExchangePayload> for GameStep<CardExchangeState> {
+    fn validate_payload(
+        &self,
+        payload: &CardExchangePayload,
+        player: &str,
+    ) -> GameResult<()> {
+        if self.state.cards_to_exchange.get(player).is_some() {
+            Err(
+                GameError::InvalidAction(
+                    format!("Player {} has already declared cards for exchange", player)
+                )
+            )?
+        }
+
+        for card in &payload.cards_to_exchange {
+            self.validate_player_has_card(card, player)?
+        }
+
+        Ok(())
+    }
+
+    fn dispatch_payload(
+        &mut self,
+        payload: &CardExchangePayload,
+        player: &str
+    ) {
+        self.state.cards_to_exchange.insert(
+            player.to_string(), payload.cards_to_exchange.clone()
+        );
     }
 }
 
@@ -251,7 +257,7 @@ mod tests {
 
         // club 3 card starts in player 1 deck
         // during the exchange, it will get passed to player 2
-        // player 2 placed club 3 automatically due to game rules, so player 3 is next
+        // player 2 placed club 3 automatically due to game rules, so player 3 is to_round_in_progress
         assert_eq!(round_in_progress_step.state.current_player, "3".to_string());
         assert_eq!(round_in_progress_step.state.table_suit, Some(Club));
     }

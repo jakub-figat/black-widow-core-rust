@@ -1,23 +1,12 @@
-use std::collections::HashSet;
-use crate::error::{GameError, GameResult};
+use std::collections::HashMap;
+use crate::error::GameResult;
+use crate::payload::ClaimReadinessPayload;
+use crate::r#trait::PayloadHandler;
 use crate::step::card_exchange::CardExchangeState;
 use crate::step::GameStep;
 
 
 impl GameStep<RoundFinishedState> {
-    pub fn claim_readiness(&mut self, player: &str) -> GameResult<()> {
-        if self.state.players_ready.contains(player) {
-            Err(
-                GameError::InvalidAction(
-                    format!("Player {} has already claimed readiness", player)
-                )
-            )?
-        }
-
-        self.state.players_ready.insert(player.to_string());
-        Ok(())
-    }
-
     pub fn should_switch(&self) -> bool {
         self.state.players_ready.len() == self.players.len()
     }
@@ -38,9 +27,19 @@ impl GameStep<RoundFinishedState> {
 
 }
 
+impl PayloadHandler<'_, ClaimReadinessPayload> for GameStep<RoundFinishedState> {
+    fn validate_payload(&self, _payload: &ClaimReadinessPayload, _player: &str) -> GameResult<()> {
+        Ok(())
+    }
+
+    fn dispatch_payload(&mut self, payload: &ClaimReadinessPayload, player: &str) {
+        self.state.players_ready.insert(player.to_string(), payload.ready);
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct RoundFinishedState {
-    pub players_ready: HashSet<String>
+    pub players_ready: HashMap<String, bool>
 }
 
 #[cfg(test)]
@@ -60,27 +59,28 @@ mod tests {
             player_to_player_map: get_player_to_player_map(&players),
             scores: HashMap::new(),
             player_decks: HashMap::new(),
-            state: RoundFinishedState {players_ready: HashSet::new()}
+            state: RoundFinishedState {players_ready: HashMap::new()}
         }
     }
 
     #[test]
     fn claim_readiness() {
         let mut step = get_step();
-        let result = step.claim_readiness("1");
+        let payload = ClaimReadinessPayload {ready: true};
+        let result = step.dispatch_payload(&payload, "1");
 
-        assert!(result.is_ok());
-        assert_eq!(step.state.players_ready.len(), 1);
+        assert_eq!(step.state.players_ready["1"], true);
     }
 
     #[test]
     fn claim_readiness_when_already_claimed() {
         let mut step = get_step();
-        step.state.players_ready.insert("1".to_string());
-        let result = step.claim_readiness("1");
+        step.state.players_ready.insert("1".to_string(), true);
 
-        assert_eq!(result, Err(GameError::InvalidAction("Player 1 has already claimed readiness".to_string())));
-        assert_eq!(step.state.players_ready.len(), 1);
+        let payload = ClaimReadinessPayload {ready: false};
+        let result = step.dispatch_payload(&payload, "1");
+
+        assert_eq!(step.state.players_ready["1"], false);
     }
 
     #[test]
