@@ -46,6 +46,7 @@ impl GameStep<CardExchangeState> {
         self.exchange_cards_between_players();
 
         let (player, starting_card) = pick_player_with_starting_card(&self.player_decks).unwrap();
+        self.player_decks.get_mut(&player).unwrap().remove(&starting_card);
 
         let state = RoundInProgressState {
             current_player: self.player_to_player_map.get(&player).unwrap().to_string(),

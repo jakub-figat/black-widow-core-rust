@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::mem::discriminant;
 use crate::card::{Card, CardSuit};
 use crate::card::CardSuit::Heart;
 use crate::error::{GameError, GameResult};
@@ -8,6 +9,18 @@ use crate::step::GameStep;
 use crate::step::round_finished::RoundFinishedState;
 
 impl GameStep<RoundInProgressState> {
+    fn validate_current_player(&self, player: &str) -> GameResult<()> {
+        if self.state.current_player != player {
+            Err(
+                GameError::InvalidAction(
+                    format!("Cannot make move, current player is {}", self.state.current_player)
+                )
+            )?
+        }
+
+        Ok(())
+    }
+
     fn validate_placed_suit(&self, placed_suit: CardSuit, table_suit: CardSuit, player: &str) -> GameResult<()> {
         if placed_suit != table_suit && self.check_if_player_has_suit(player, table_suit) {
             Err(
@@ -40,7 +53,7 @@ impl GameStep<RoundInProgressState> {
         Ok(())
     }
 
-    fn place_card(&mut self, card: &Card) {
+    pub fn place_card(&mut self, card: &Card) {
         let current_player = &self.state.current_player;
         self.player_decks.get_mut(current_player).unwrap().remove(card);
         self.state.cards_on_table.insert(current_player.clone(), card.clone());
@@ -90,6 +103,7 @@ impl GameStep<RoundInProgressState> {
 
 impl PayloadHandler<'_, PlaceCardPayload> for GameStep<RoundInProgressState> {
     fn validate_payload(&self, payload: &PlaceCardPayload, player: &str) -> GameResult<()> {
+        self.validate_current_player(player)?;
         self.validate_player_has_card(&payload.card, &self.state.current_player)?;
 
         match self.state.table_suit {
@@ -160,6 +174,27 @@ mod tests {
                 cards_on_table: HashMap::new()
             }
         }
+    }
+
+    #[test]
+    fn validate_current_player_when_current_player() {
+        let players = get_players();
+        let step = get_step_from_players(&players);
+
+        assert!(step.validate_current_player("1").is_ok());
+    }
+
+    #[test]
+    fn validate_current_player_when_not_current_player() {
+        let players = get_players();
+        let step = get_step_from_players(&players);
+        let expected_error = Err(
+            GameError::InvalidAction(
+                "Cannot make move, current player is 1".to_string()
+            )
+        );
+
+        assert_eq!(step.validate_current_player("2"), expected_error);
     }
 
     #[test]

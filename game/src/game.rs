@@ -14,8 +14,6 @@ pub struct Game {
     players: Vec<String>
 }
 
-// TODO later: validate that payload user is current user
-
 impl Game {
     pub fn new(players: &[String], settings: GameSettings) -> Game {
         let number_of_players = players.len();
@@ -29,28 +27,28 @@ impl Game {
         }
     }
 
-    pub fn play(&self, input_handler: fn() -> String, error_writer: fn(err: Box<dyn Error>)) {
+    pub fn play(&self, input_handler: fn() -> (String, String), error_writer: fn(err: Box<dyn Error>)) {
         let mut game_state = GameState::get_initial_state(&self.players);
         loop {
-            let json_payload = input_handler();
+            let (json_payload, player) = input_handler();
 
             game_state = match game_state {
                 CardExchange(mut step) => {
-                    step.handle_payload(&json_payload, "1", error_writer);
+                    step.handle_payload(&json_payload, &player, error_writer);
                     match step.should_switch() {
                         true => RoundInProgress(step.to_round_in_progress()),
                         false => CardExchange(step)
                     }
                 },
                 RoundInProgress(mut step) => {
-                    step.handle_payload(&json_payload, "1", error_writer);
+                    step.handle_payload(&json_payload, &player, error_writer);
                     match step.should_switch() {
                         true => RoundFinished(step.to_round_finished()),
                         false => RoundInProgress(step)
                     }
                 },
                 RoundFinished(mut step) => {
-                    step.handle_payload(&json_payload, "1", error_writer);
+                    step.handle_payload(&json_payload, &player, error_writer);
                     if step.game_finished(self.settings.max_score) {
                         break;
                     }

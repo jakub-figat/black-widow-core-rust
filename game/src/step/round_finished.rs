@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use crate::error::GameResult;
+use crate::helper::get_starting_player_decks;
 use crate::payload::ClaimReadinessPayload;
 use crate::r#trait::PayloadHandler;
 use crate::step::card_exchange::CardExchangeState;
@@ -17,10 +18,10 @@ impl GameStep<RoundFinishedState> {
 
     pub fn to_card_exchange(self) -> GameStep<CardExchangeState> {
         GameStep {
-            players: self.players,
+            players: self.players.clone(),
             player_to_player_map: self.player_to_player_map,
             scores: self.scores,
-            player_decks: self.player_decks,
+            player_decks: get_starting_player_decks(&self.players),
             state: CardExchangeState::new()
         }
     }

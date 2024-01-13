@@ -33,7 +33,7 @@ pub struct Card {
 impl Display for Card {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         let temp_other = self.value.to_string();
-;        let value = match self.value {
+        let value = match self.value {
             11 => "JACK",
             12 => "QUEEN",
             13 => "KING",
