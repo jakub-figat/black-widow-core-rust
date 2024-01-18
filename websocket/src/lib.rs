@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
+use std::ops::ControlFlow;
 use std::sync::{Arc, Mutex};
 use axum::extract::{ConnectInfo, State};
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
@@ -71,7 +72,9 @@ async fn handle_socket(websocket: WebSocket, address: SocketAddr, state: Arc<Web
     // task for handling messages received from websocket
     let mut receiver_task = tokio::spawn(async move {
         while let Some(Ok(message)) = stream.next().await {
-            handle_player_message(message, state.clone(), &mut sender, &address).await
+            if handle_player_message(message, state.clone(), &mut sender, &address).await.is_break() {
+                break;
+            }
         }
     });
 
@@ -94,21 +97,28 @@ async fn handle_player_message(
     state: Arc<WebSocketGameState>,
     sender: &mut mpsc::Sender<Message>,
     address: &SocketAddr
-) {
+) -> ControlFlow<(), ()> {
 
     let broadcast_sender = state.broadcast_sender.clone();
     match message {
         Message::Text(text) => {
-            if text == "start game" {
-                broadcast_sender.send(Message::Text(format!("{} wants to start a game", address))).unwrap();
-            } else {
-                sender.send(Message::Text("unknown command".to_string())).await.unwrap();
+            let message = Message::Text(match &text[..] {
+                "start_game" => format!("{} wants to start a game", address),
+                _ => "unknown_command".to_string()
+            });
+
+            if broadcast_sender.send(message).is_err() {
+                return ControlFlow::Break(());
             }
+        }
+        Message::Close(_) => {
+            return ControlFlow::Break(());
         }
         _ => {
             sender.send(Message::Text("unknown command".to_string())).await.unwrap();
         }
     }
+    ControlFlow::Continue(())
 }
 
 // dispatch player message
