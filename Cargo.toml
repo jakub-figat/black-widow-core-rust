@@ -1,4 +1,4 @@
-workspace = { members = ["game"] }
+workspace = { members = ["game", "websocket"] }
 [package]
 name = "black-widow-core-rust"
 version = "0.1.0"
@@ -6,5 +6,7 @@ edition = "2021"
 
 [dependencies]
 game = {path = "./game"}
+websocket = {path = "./websocket"}
 serde = { version = "1.0", features = ["derive"] }
+tokio = "1.35.1"
 
