@@ -13,9 +13,9 @@ use crate::step::round_in_progress::RoundInProgressState;
 
 
 impl GameStep<CardExchangeState> {
-    pub fn initialize_from_players(players: &Vec<String>) -> GameStep<CardExchangeState> {
+    pub fn initialize_from_players(players: &[String]) -> GameStep<CardExchangeState> {
         GameStep {
-            players: players.clone(),
+            players: players.to_vec(),
             player_to_player_map: get_player_to_player_map(&players),
             scores: HashMap::new(),
             player_decks: get_starting_player_decks(&players),
@@ -23,9 +23,9 @@ impl GameStep<CardExchangeState> {
         }
     }
 
-    pub fn empty_from_players(players: &Vec<String>) -> GameStep<CardExchangeState> {
+    pub fn empty_from_players(players: &[String]) -> GameStep<CardExchangeState> {
         GameStep {
-            players: players.clone(),
+            players: players.to_vec(),
             player_to_player_map: get_player_to_player_map(&players),
             scores: HashMap::new(),
             player_decks: HashMap::from_iter(
