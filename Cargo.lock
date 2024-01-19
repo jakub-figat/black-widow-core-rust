@@ -1055,6 +1055,8 @@ dependencies = [
  "axum",
  "futures",
  "game",
+ "serde",
+ "serde_json",
  "tokio",
 ]
 

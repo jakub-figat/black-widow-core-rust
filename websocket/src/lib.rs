@@ -11,6 +11,7 @@ use futures::{SinkExt, StreamExt};
 use tokio::net::TcpListener;
 use tokio::sync::{broadcast, mpsc};
 use game::Game;
+use serde::Deserialize;
 
 
 pub async fn start_game_server() {
@@ -28,15 +29,13 @@ pub async fn start_game_server() {
 }
 
 
-pub struct WebSocketGameState {
+struct WebSocketGameState {
     games: Arc<Mutex<HashMap<String, Game>>>,
     broadcast_sender: broadcast::Sender<Message>
 }
 
 impl WebSocketGameState {
     pub fn new() -> WebSocketGameState {
-        broadcast::channel::<Message>(128).0;
-
         WebSocketGameState {
             games: Arc::new(Mutex::new(HashMap::new())),
             broadcast_sender: broadcast::channel::<Message>(128).0
@@ -72,7 +71,7 @@ async fn handle_socket(websocket: WebSocket, address: SocketAddr, state: Arc<Web
     // task for handling messages received from websocket
     let mut receiver_task = tokio::spawn(async move {
         while let Some(Ok(message)) = stream.next().await {
-            if handle_player_message(message, state.clone(), &mut sender, &address).await.is_break() {
+            if handle_message(message, state.clone(), &mut sender, &address).await.is_break() {
                 break;
             }
         }
@@ -92,34 +91,81 @@ async fn handle_socket(websocket: WebSocket, address: SocketAddr, state: Arc<Web
     }
 }
 
-async fn handle_player_message(
+async fn handle_message(
     message: Message,
     state: Arc<WebSocketGameState>,
     sender: &mut mpsc::Sender<Message>,
     address: &SocketAddr
 ) -> ControlFlow<(), ()> {
+    let mut broadcast_sender = state.broadcast_sender.clone();
 
-    let broadcast_sender = state.broadcast_sender.clone();
-    match message {
+    return match message {
         Message::Text(text) => {
-            let message = Message::Text(match &text[..] {
-                "start_game" => format!("{} wants to start a game", address),
-                _ => "unknown_command".to_string()
-            });
-
-            if broadcast_sender.send(message).is_err() {
-                return ControlFlow::Break(());
-            }
+            handle_text_message(text, sender, &mut broadcast_sender, address).await
         }
         Message::Close(_) => {
-            return ControlFlow::Break(());
+            ControlFlow::Break(())
         }
         _ => {
-            sender.send(Message::Text("unknown command".to_string())).await.unwrap();
+            send_text_or_break("Invalid message", sender).await
         }
+    }
+}
+
+async fn handle_text_message(
+    text: String,
+    sender: &mut mpsc::Sender<Message>,
+    broadcast_sender: &mut broadcast::Sender<Message>,
+    address: &SocketAddr
+) -> ControlFlow<(), ()> {
+    match serde_json::from_str::<WebSocketPayload>(&text) {
+        Ok(payload) => {
+            match payload.action {
+                WebSocketAction::StartGame => {
+                    broadcast_text_or_break(
+                        &format!("{} wants to start a game", address),
+                        broadcast_sender,
+                    )
+                }
+                _ => {
+                    send_text_or_break("Invalid action", sender).await
+                }
+            }
+        }
+        Err(error) => {
+            send_text_or_break(
+                &format!("Invalid JSON payload: {}", error.to_string()),
+                sender
+            ).await
+        }
+    }
+}
+
+async fn send_text_or_break(text: &str, sender: &mut mpsc::Sender<Message>) -> ControlFlow<(), ()> {
+    if sender.send(Message::Text(text.to_string())).await.is_err() {
+        return ControlFlow::Break(());
     }
     ControlFlow::Continue(())
 }
 
-// dispatch player message
-// improve horrible error handling
+fn broadcast_text_or_break(text: &str, sender: &mut broadcast::Sender<Message>) -> ControlFlow<(), ()> {
+    if sender.send(Message::Text(text.to_string())).is_err() {
+        return ControlFlow::Break(());
+    }
+    ControlFlow::Continue(())
+}
+
+#[derive(Deserialize)]
+struct WebSocketPayload {
+    action: WebSocketAction
+}
+
+#[derive(Deserialize)]
+enum WebSocketAction {
+    #[serde(rename = "startGame")]
+    StartGame,
+    #[serde(rename = "joinGame")]
+    JoinGame,
+    #[serde(rename = "gameMove")]
+    GameMove
+}
