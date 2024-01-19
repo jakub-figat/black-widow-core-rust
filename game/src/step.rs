@@ -8,15 +8,15 @@ pub mod round_finished;
 
 
 #[derive(Debug, Clone)]
-pub struct GameStep<T> {
-    players: Vec<String>,
-    player_to_player_map: HashMap<String, String>,
-    scores: HashMap<String, usize>,
-    player_decks: HashMap<String, HashSet<Card>>,
-    state: T
+pub struct GameStep<S> {
+    pub players: Vec<String>,
+    pub player_to_player_map: HashMap<String, String>,
+    pub scores: HashMap<String, usize>,
+    pub player_decks: HashMap<String, HashSet<Card>>,
+    pub state: S
 }
 
-impl<T> GameStep<T> {
+impl<S> GameStep<S> {
     fn validate_player_has_card(&self, card: &Card, player: &str) -> GameResult<()> {
         if !&self.player_decks.get(player).unwrap().contains(card) {
             Err(

@@ -6,8 +6,9 @@ use axum::extract::ws::{Message, WebSocket};
 use axum::response::IntoResponse;
 use futures::{SinkExt, StreamExt};
 use tokio::sync::{broadcast, mpsc};
-use crate::game_action::start_game;
-use crate::payload::{WebSocketAction, WebSocketPayload, WebSocketResponse};
+use crate::game_action::{list_games, start_game};
+use crate::payload::{WebSocketAction, WebSocketPayload};
+use crate::response::ErrorResponse;
 use crate::WebSocketGameState;
 
 pub(crate) async fn handle(
@@ -79,6 +80,7 @@ pub(crate) async fn handle_message(
     }
 }
 
+
 pub(crate) async fn handle_text_message(
     text: String,
     sender: &mut mpsc::Sender<Message>,
@@ -92,19 +94,20 @@ pub(crate) async fn handle_text_message(
                 WebSocketAction::StartGame => {
                     start_game(broadcast_sender, state, address).await
                 }
+                WebSocketAction::ListGames => {
+                    list_games(sender, state).await
+                }
                 _ => {
                     send_text_or_break(
-                        &WebSocketResponse::json_from_error("Invalid action"),
+                        &ErrorResponse::json_from_detail("Invalid action"),
                         sender
-                    ).await // this will be removed when all actions are handled
+                    ).await // TODO: this will be removed when all actions are handled
                 }
             }
         }
-        Err(error) => {
+        Err(_) => {
             send_text_or_break(
-                &WebSocketResponse::json_from_error(
-                    &format!("Invalid JSON payload: {}", error.to_string())
-                ),
+                &ErrorResponse::json_from_detail("Invalid JSON payload"),
                 sender
             ).await
         }

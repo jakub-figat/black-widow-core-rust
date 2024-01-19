@@ -1,12 +1,16 @@
 use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Deserialize, Serialize)]
 pub enum CardSuit {
+    #[serde(rename = "spade")]
     Spade,
+    #[serde(rename = "club")]
     Club,
+    #[serde(rename = "heart")]
     Heart,
+    #[serde(rename = "diamond")]
     Diamond
 }
 
@@ -23,7 +27,7 @@ impl Display for CardSuit {
 }
 
 
-#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Deserialize, Serialize)]
 pub struct Card {
     pub suit: CardSuit,
     pub value: usize,
@@ -38,7 +42,7 @@ impl Display for Card {
             12 => "QUEEN",
             13 => "KING",
             14 => "ACE",
-            other => temp_other.as_str()
+            _ => temp_other.as_str()
         };
         write!(f, "{}_{}", &self.suit, value)
     }

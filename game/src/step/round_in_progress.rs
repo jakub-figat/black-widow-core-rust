@@ -1,5 +1,4 @@
 use std::collections::{HashMap, HashSet};
-use std::mem::discriminant;
 use crate::card::{Card, CardSuit};
 use crate::card::CardSuit::Heart;
 use crate::error::{GameError, GameResult};

@@ -1,4 +1,5 @@
 use std::error::Error;
+use serde::Serialize;
 use crate::error::GameError;
 use crate::game::GameState::{CardExchange, RoundFinished, RoundInProgress};
 use crate::r#trait::PayloadHandler;
@@ -12,9 +13,9 @@ use crate::step::round_in_progress::RoundInProgressState;
 
 #[derive(Debug)]
 pub struct Game {
-    settings: GameSettings,
+    pub settings: GameSettings,
     pub players: Vec<String>,
-    state: Option<GameState>
+    pub state: Option<GameState>
 }
 
 impl Game {
@@ -80,8 +81,9 @@ impl Game {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct GameSettings {
+    #[serde(rename = "maxScore")]
     pub max_score: usize,
 }
 

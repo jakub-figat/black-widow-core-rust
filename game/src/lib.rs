@@ -7,3 +7,4 @@ mod helper;
 mod r#trait;
 
 pub use game::{Game, GameSettings};
+pub use card::Card;
