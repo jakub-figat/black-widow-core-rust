@@ -26,7 +26,7 @@ pub(crate) enum WebSocketAction {
 pub(crate) struct WebSocketPayload {
     pub(crate) action: WebSocketAction,
     #[serde(default)]
-    payload: String,
+    pub(crate) data: String,
 }
 
 #[derive(Deserialize)]

@@ -1,4 +1,4 @@
-use crate::handler::{broadcast_text_or_break, send_text_or_break};
+use crate::helper::{broadcast_text_or_break, send_text_or_break};
 use crate::response::{
     CardExchangeState, ErrorResponse, GameDetails, GameListResponse, RoundFinishedState,
     RoundInProgressState,
@@ -89,7 +89,6 @@ pub(crate) async fn get_game_details(
 }
 
 pub(crate) async fn game_move(
-    id: &str,
     payload: &str,
     player: &str,
     sender: &mut Sender,
