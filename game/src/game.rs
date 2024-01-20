@@ -32,16 +32,6 @@ impl Game {
         }
     }
 
-    pub fn new_by_player(player: &str, settings: GameSettings) -> Game {
-        let mut game = Game {
-            settings,
-            players: Vec::with_capacity(4),
-            state: None
-        };
-        game.players.push(player.to_string());
-        game
-    }
-
     pub fn dispatch_payload(&mut self, payload: &str, player: &str) -> Result<(), Box<dyn Error>> {
         match self.state.take() {
             Some(state) => {

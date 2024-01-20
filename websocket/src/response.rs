@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
-use std::hash::Hash;
 use serde::Serialize;
 use game::{Card, Game, GameSettings};
-use game::game::GameState::{CardExchange, RoundInProgress, RoundFinished};
+use game::{CardExchange, RoundInProgress, RoundFinished};
+use game::step::GameStep;
 use crate::helper::{get_obfuscated_exchange_cards, get_obfuscated_player_cards};
 
 
@@ -70,6 +70,22 @@ pub(crate) struct ObfuscatedGame<S: Serialize> {
     state: S
 }
 
+
+impl<S: Serialize> ObfuscatedGame<S> {
+    pub(crate) fn new<T>(
+        game: &Game, step: &GameStep<T>, state: S, player: &str
+    ) -> ObfuscatedGame<S> {
+        ObfuscatedGame {
+            settings: game.settings.clone(),
+            players: game.players.to_vec(),
+            scores: step.scores.clone(),
+            player_decks: get_obfuscated_player_cards(&step.player_decks, player),
+            your_cards: step.player_decks[player].clone(),
+            state
+        }
+    }
+}
+
 #[derive(Serialize)]
 pub(crate) struct CardExchangeState {
     #[serde(rename = "playerExchangeCards")]
@@ -91,61 +107,37 @@ pub(crate) struct RoundFinishedState {
 }
 
 impl<S: Serialize> GameDetails<S> {
-    // TODO: boilerplate af, needs refactor
     pub(crate) fn json_from_game(game: &Game, player: &str) -> String {
-        let settings = game.settings.clone();
-        let players = game.players.clone();
         match game.state.as_ref().unwrap() {
             CardExchange(step) => {
-                let obfuscated_game = ObfuscatedGame {
-                    settings,
-                    players,
-                    scores: step.scores.clone(),
-                    player_decks: get_obfuscated_player_cards(
-                        &step.player_decks,
+                let state = CardExchangeState {
+                    player_exchange_cards: get_obfuscated_exchange_cards(
+                        &step.state.cards_to_exchange,
                         player
                     ),
-                    your_cards: step.player_decks[player].clone(),
-                    state: CardExchangeState {
-                        player_exchange_cards: get_obfuscated_exchange_cards(
-                            &step.state.cards_to_exchange,
-                            player
-                        ),
-                        your_exchange_cards: step.state.cards_to_exchange[player].clone(),
-                    }
+                    your_exchange_cards: step.state.cards_to_exchange[player].clone(),
                 };
+                let obfuscated_game = ObfuscatedGame::new(
+                    game, &step, state, player
+                );
                 serde_json::to_string(&obfuscated_game).unwrap()
             },
             RoundInProgress(step) => {
-                let obfuscated_game = ObfuscatedGame {
-                    settings,
-                    players,
-                    scores: step.scores.clone(),
-                    player_decks: get_obfuscated_player_cards(
-                        &step.player_decks,
-                        player
-                    ),
-                    your_cards: step.player_decks[player].clone(),
-                    state: RoundInProgressState {
-                        cards_on_table: step.state.cards_on_table.clone()
-                    }
+                let state = RoundInProgressState {
+                    cards_on_table: step.state.cards_on_table.clone()
                 };
+                let obfuscated_game = ObfuscatedGame::new(
+                    game, &step, state, player
+                );
                 serde_json::to_string(&obfuscated_game).unwrap()
             },
             RoundFinished(step) => {
-                let obfuscated_game = ObfuscatedGame {
-                    settings,
-                    players,
-                    scores: step.scores.clone(),
-                    player_decks: get_obfuscated_player_cards(
-                        &step.player_decks,
-                        player
-                    ),
-                    your_cards: step.player_decks[player].clone(),
-                    state: RoundFinishedState {
-                        players_ready: step.state.players_ready.clone()
-                    }
+                let state = RoundFinishedState {
+                    players_ready: step.state.players_ready.clone()
                 };
+                let obfuscated_game = ObfuscatedGame::new(
+                    game, &step, state, player
+                );
                 serde_json::to_string(&obfuscated_game).unwrap()
             }
         }

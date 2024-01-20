@@ -1,59 +1,126 @@
-use std::net::SocketAddr;
-use std::ops::ControlFlow;
+use std::ops;
 use std::sync::Arc;
 use axum::extract::ws::Message;
 use tokio::sync::{broadcast, mpsc};
-use game::{Game, GameSettings};
+use game::{CardExchange, RoundInProgress, RoundFinished};
 use crate::WebSocketGameState;
 use crate::handler::{broadcast_text_or_break, send_text_or_break};
-use crate::response::GameListResponse;
+use crate::response::{
+    CardExchangeState,
+    ErrorResponse,
+    GameDetails,
+    GameListResponse,
+    RoundFinishedState,
+    RoundInProgressState
+};
 
-pub(crate) async fn start_game(
-    broadcast_sender: &mut broadcast::Sender<Message>,
-    state: Arc<WebSocketGameState>,
-    address: &SocketAddr
-) -> ControlFlow<(), ()> {
-    let game = Game::new_by_player(
-        &address.to_string(), GameSettings {max_score: 100}
-    );
-    state.games.write().await.insert("some_uid4".to_string(), game);
 
-    // broadcast to all
-    // TODO
-    broadcast_text_or_break("game started", broadcast_sender)?;
+type ControlFlow = ops::ControlFlow<(), ()>;
+type Sender = mpsc::Sender<Message>;
+type BroadcastSender = broadcast::Sender<Message>;
+
+pub(crate) async fn list_lobbies(
+    sender: &mut Sender,
+    state: Arc<WebSocketGameState>
+) -> ControlFlow {
+    ControlFlow::Continue(())
+}
+
+pub(crate) async fn get_lobby_details(
+    id: &str,
+    sender: &mut Sender,
+    state: Arc<WebSocketGameState>
+) -> ControlFlow {
+    ControlFlow::Continue(())
+}
+
+pub(crate) async fn create_lobby(
+    player: &str,
+    broadcast_sender: &mut BroadcastSender,
+    state: Arc<WebSocketGameState>
+) -> ControlFlow {
+    broadcast_text_or_break("gitara siema", broadcast_sender)
+}
+
+pub(crate) async fn join_lobby(
+    id: &str,
+    player: &str,
+    sender: &mut Sender,
+    broadcast_sender: &mut BroadcastSender,
+    state: Arc<WebSocketGameState>
+) -> ControlFlow {
+    ControlFlow::Continue(())
+}
+
+pub(crate) async fn quit_lobby(
+    id: &str,
+    player: &str,
+    sender: &mut Sender,
+    broadcast_sender: &mut BroadcastSender,
+    state: Arc<WebSocketGameState>
+) -> ControlFlow {
     ControlFlow::Continue(())
 }
 
 pub(crate) async fn list_games(
-    sender: &mut mpsc::Sender<Message>,
+    sender: &mut Sender,
     state: Arc<WebSocketGameState>
-) -> ControlFlow<(), ()> {
+) -> ControlFlow {
     let game_hashmap = state.games.read().await;
     let response = GameListResponse::json_from_game_hashmap(&game_hashmap);
-
     send_text_or_break(&response, sender).await
 }
 
-
-// TODO: check if player belongs to given game
-pub(crate) async fn get_game_details() {
-
+pub(crate) async fn get_game_details(
+    id: &str,
+    player: &str,
+    sender: &mut Sender,
+    state: Arc<WebSocketGameState>
+) -> ControlFlow {
+    let game_hashmap = state.games.read().await;
+    let response = match game_hashmap.get(id) {
+        Some(game) => {
+            match game.players.iter().find(|&s| s.as_str() == player) {
+                Some(_) => {
+                    match game.state.as_ref().unwrap() {
+                        CardExchange(_) => GameDetails::<CardExchangeState>::json_from_game(game, player),
+                        RoundInProgress(_) => GameDetails::<RoundInProgressState>::json_from_game(game, player),
+                        RoundFinished(_) => GameDetails::<RoundFinishedState>::json_from_game(game, player)
+                    }
+                }
+                None => {
+                    ErrorResponse::json_from_detail(&format!("You don't belong to game with id {}", id))
+                }
+            }
+        }
+        None => ErrorResponse::json_from_detail(&format!("Game with id {} does not exist", id))
+    };
+    send_text_or_break(&response, sender).await
 }
 
+pub(crate) async fn game_move(
+    id: &str,
+    payload: &str,
+    player: &str,
+    sender: &mut Sender,
+    broadcast_sender: &mut BroadcastSender,
+    state: Arc<WebSocketGameState>
+) -> ControlFlow {
+    ControlFlow::Continue(())
+}
+
+pub(crate) async fn quit_game(
+    id: &str,
+    player: &str,
+    sender: &mut Sender,
+    broadcast_sender: &mut BroadcastSender,
+    state: Arc<WebSocketGameState>
+) -> ControlFlow {
+    ControlFlow::Continue(())
+}
+
+
 // TODO:
-// create (&join game)
-// join game
-// get game detail
-
-
-// game moves
-
-// cards for exchange
-// place card
-// claim readiness
-// quit
-
-
+// add lobbies, without them sending game state is nightmare
 // ws auth
 // maybe redis for shared state if scaling instances
-// broadcasting when necessary, obfuscate what necessary
