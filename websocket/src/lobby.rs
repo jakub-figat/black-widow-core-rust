@@ -1,7 +1,7 @@
 use serde::Serialize;
 use crate::error::ValidationError;
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub(crate) struct Lobby {
     #[serde(rename = "maxPlayers")]
     max_players: usize,

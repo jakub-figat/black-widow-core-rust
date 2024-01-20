@@ -4,17 +4,75 @@ use game::{Card, Game, GameSettings};
 use game::{CardExchange, RoundFinished, RoundInProgress};
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
+use crate::lobby::Lobby;
 
 #[derive(Serialize)]
 pub(crate) enum ResponseType {
+    #[serde(rename = "lobbyList")]
+    LobbyList,
+    #[serde(rename = "lobbyDetails")]
+    LobbyDetails,
+    #[serde(rename = "LobbyDeleted")]
+    LobbyDeleted,
     #[serde(rename = "gameList")]
     GameList,
     #[serde(rename = "gameDetails")]
     GameDetails,
+    #[serde(rename = "gameDeleted")]
+    GameDeleted,
     #[serde(rename = "info")]
     Info,
     #[serde(rename = "error")]
     Error,
+}
+
+#[derive(Serialize)]
+pub(crate) struct LobbyListResponse {
+    #[serde(rename = "responseType")]
+    pub(crate) response_type: ResponseType,
+    pub(crate) lobbies: Vec<Lobby>,
+}
+
+impl LobbyListResponse {
+    pub(crate) fn new(lobbies: &[Lobby]) -> LobbyListResponse {
+        LobbyListResponse {
+            response_type: ResponseType::LobbyList,
+            lobbies: lobbies.to_vec()
+        }
+    }
+}
+
+#[derive(Serialize)]
+pub(crate) struct LobbyDetailsResponse {
+    #[serde(rename = "responseType")]
+    pub(crate) response_type: ResponseType,
+    pub(crate) lobby: Lobby,
+}
+
+impl LobbyDetailsResponse {
+    pub(crate) fn new(lobby: &Lobby) -> LobbyDetailsResponse {
+        LobbyDetailsResponse {
+            response_type: ResponseType::LobbyDetails,
+            lobby: lobby.clone()
+        }
+    }
+}
+
+
+#[derive(Serialize)]
+pub(crate) struct LobbyDeletedResponse {
+    #[serde(rename = "responseType")]
+    pub(crate) response_type: ResponseType,
+    pub(crate) id: String,
+}
+
+impl LobbyDeletedResponse {
+    pub(crate) fn new(id: &str) -> LobbyDeletedResponse {
+        LobbyDeletedResponse {
+            response_type: ResponseType::LobbyDeleted,
+            id: id.to_string()
+        }
+    }
 }
 
 #[derive(Serialize)]
@@ -48,11 +106,55 @@ pub(crate) struct ListedGame {
     pub(crate) players: Vec<String>,
 }
 
-// TODO: IMPORTANT to obfuscate state and check if player belongs to given game
+
 #[derive(Serialize)]
-pub(crate) struct GameDetails<S: Serialize> {
+pub(crate) struct GameDetailsResponse<S: Serialize> {
+    #[serde(rename = "responseType")]
+    response_type: ResponseType,
     id: String,
     game: ObfuscatedGame<S>,
+}
+
+impl<S: Serialize> GameDetailsResponse<S> {
+    // TODO: somehow refactor?
+    pub(crate) fn json_from_game(id: &str, game: &Game, player: &str) -> String {
+        match game.state.as_ref().unwrap() {
+            CardExchange(step) => {
+                let state = CardExchangeState {
+                    player_exchange_cards: get_obfuscated_exchange_cards(
+                        &step.state.cards_to_exchange,
+                        player,
+                    ),
+                    your_exchange_cards: step.state.cards_to_exchange[player].clone(),
+                };
+                let obfuscated_game = ObfuscatedGame::new(game, &step, state, player);
+                GameDetailsResponse::json_from_obfuscated_game_state(id, obfuscated_game)
+            }
+            RoundInProgress(step) => {
+                let state = RoundInProgressState {
+                    cards_on_table: step.state.cards_on_table.clone(),
+                };
+                let obfuscated_game = ObfuscatedGame::new(game, &step, state, player);
+                GameDetailsResponse::json_from_obfuscated_game_state(id, obfuscated_game)
+            }
+            RoundFinished(step) => {
+                let state = RoundFinishedState {
+                    players_ready: step.state.players_ready.clone(),
+                };
+                let obfuscated_game = ObfuscatedGame::new(game, &step, state, player);
+                GameDetailsResponse::json_from_obfuscated_game_state(id, obfuscated_game)
+            }
+        }
+    }
+
+    fn json_from_obfuscated_game_state(id: &str, game: ObfuscatedGame<S>) -> String {
+        let response = GameDetailsResponse {
+            response_type: ResponseType::GameDetails,
+            id: id.to_string(),
+            game
+        };
+        serde_json::to_string(&response).unwrap()
+    }
 }
 
 #[derive(Serialize)]
@@ -105,37 +207,42 @@ pub(crate) struct RoundFinishedState {
     players_ready: HashMap<String, bool>,
 }
 
-impl<S: Serialize> GameDetails<S> {
-    pub(crate) fn json_from_game(game: &Game, player: &str) -> String {
-        match game.state.as_ref().unwrap() {
-            CardExchange(step) => {
-                let state = CardExchangeState {
-                    player_exchange_cards: get_obfuscated_exchange_cards(
-                        &step.state.cards_to_exchange,
-                        player,
-                    ),
-                    your_exchange_cards: step.state.cards_to_exchange[player].clone(),
-                };
-                let obfuscated_game = ObfuscatedGame::new(game, &step, state, player);
-                serde_json::to_string(&obfuscated_game).unwrap()
-            }
-            RoundInProgress(step) => {
-                let state = RoundInProgressState {
-                    cards_on_table: step.state.cards_on_table.clone(),
-                };
-                let obfuscated_game = ObfuscatedGame::new(game, &step, state, player);
-                serde_json::to_string(&obfuscated_game).unwrap()
-            }
-            RoundFinished(step) => {
-                let state = RoundFinishedState {
-                    players_ready: step.state.players_ready.clone(),
-                };
-                let obfuscated_game = ObfuscatedGame::new(game, &step, state, player);
-                serde_json::to_string(&obfuscated_game).unwrap()
-            }
+#[derive(Serialize)]
+pub(crate) struct GameDeletedResponse {
+    #[serde(rename = "responseType")]
+    response_type: ResponseType,
+    id: String
+}
+
+impl GameDeletedResponse {
+    pub(crate) fn new(id: &str) -> GameDeletedResponse {
+        GameDeletedResponse {
+            response_type: ResponseType::LobbyDeleted,
+            id: id.to_string()
         }
     }
 }
+
+
+#[derive(Serialize)]
+pub(crate) struct InfoResponse {
+    #[serde(rename = "responseType")]
+    response_type: ResponseType,
+    detail: String
+}
+
+
+impl InfoResponse {
+    pub(crate) fn json_from_detail(text: &str) -> String {
+        let response = InfoResponse {
+            response_type: ResponseType::Info,
+            detail: text.to_string(),
+        };
+
+        serde_json::to_string(&response).unwrap()
+    }
+}
+
 
 #[derive(Serialize)]
 pub(crate) struct ErrorResponse {
