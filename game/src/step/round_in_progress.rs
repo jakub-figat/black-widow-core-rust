@@ -10,7 +10,7 @@ use std::collections::{HashMap, HashSet};
 impl GameStep<RoundInProgressState> {
     fn validate_current_player(&self, player: &str) -> GameResult<()> {
         if self.state.current_player != player {
-            Err(GameError::InvalidAction(format!(
+            Err(GameError(format!(
                 "Cannot make move, current player is {}",
                 self.state.current_player
             )))?
@@ -26,7 +26,7 @@ impl GameStep<RoundInProgressState> {
         player: &str,
     ) -> GameResult<()> {
         if placed_suit != table_suit && self.check_if_player_has_suit(player, table_suit) {
-            Err(GameError::InvalidAction(format!(
+            Err(GameError(format!(
                 "Player {} tried to place {}, despite having {} in deck",
                 &player, placed_suit, table_suit
             )))?
@@ -37,7 +37,7 @@ impl GameStep<RoundInProgressState> {
 
     fn validate_only_heart_left(&self, player: &str) -> GameResult<()> {
         if !self.check_if_player_has_only_one_suit_remaining(player, Heart) {
-            Err(GameError::InvalidAction(format!(
+            Err(GameError(format!(
                 "Player {} tried to place Heart suit on the table, despite having other suits left",
                 player
             )))?
@@ -185,7 +185,7 @@ mod tests {
     fn validate_current_player_when_not_current_player() {
         let players = get_players();
         let step = get_step_from_players(&players);
-        let expected_error = Err(GameError::InvalidAction(
+        let expected_error = Err(GameError(
             "Cannot make move, current player is 1".to_string(),
         ));
 
@@ -221,7 +221,7 @@ mod tests {
 
         let payload = PlaceCardPayload { card };
 
-        let expected_error = Err(GameError::InvalidAction(
+        let expected_error = Err(GameError(
             "Player 1 tried to place DIAMOND, despite having SPADE in deck".to_string(),
         ));
         assert_eq!(step.validate_payload(&payload, &players[0]), expected_error);
@@ -260,7 +260,7 @@ mod tests {
             .insert(card.clone());
         let payload = PlaceCardPayload { card };
 
-        let expected_error = Err(GameError::InvalidAction(
+        let expected_error = Err(GameError(
             "Player 1 tried to place Heart suit on the table, despite having other suits left"
                 .to_string(),
         ));

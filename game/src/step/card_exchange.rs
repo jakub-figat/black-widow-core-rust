@@ -83,7 +83,7 @@ impl GameStep<CardExchangeState> {
 impl PayloadHandler<'_, CardExchangePayload> for GameStep<CardExchangeState> {
     fn validate_payload(&self, payload: &CardExchangePayload, player: &str) -> GameResult<()> {
         if self.state.cards_to_exchange.get(player).is_some() {
-            Err(GameError::InvalidAction(format!(
+            Err(GameError(format!(
                 "Player {} has already declared cards for exchange",
                 player
             )))?
@@ -170,7 +170,7 @@ mod tests {
 
         assert_eq!(
             step.validate_payload(&payload, &players[0]),
-            Err(GameError::InvalidAction(
+            Err(GameError(
                 "Player 1 has already declared cards for exchange".to_string()
             ))
         )

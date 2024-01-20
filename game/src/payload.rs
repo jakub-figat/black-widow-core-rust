@@ -11,7 +11,7 @@ pub struct CardExchangePayload {
 impl CardExchangePayload {
     pub fn from_cards(cards: &HashSet<Card>) -> GameResult<CardExchangePayload> {
         if cards.len() != 3 {
-            Err(GameError::InvalidPayload(
+            Err(GameError(
                 "CardExchangePayload cards require passing exactly 3 cards".to_string(),
             ))?
         }
@@ -49,7 +49,7 @@ mod tests {
         let result = CardExchangePayload::from_cards(&cards);
         assert_eq!(
             result,
-            Err(GameError::InvalidPayload(
+            Err(GameError(
                 "CardExchangePayload cards require passing exactly 3 cards".to_string()
             ))
         )

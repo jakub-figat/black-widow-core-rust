@@ -5,7 +5,9 @@ use std::collections::{HashMap, HashSet};
 use std::ops;
 use std::str::FromStr;
 use tokio::sync::{broadcast, mpsc};
-use uuid::{Error, Uuid};
+use uuid::Uuid;
+use crate::error::ValidationError;
+use crate::payload::IdPayload;
 
 type ControlFlow = ops::ControlFlow<(), ()>;
 
@@ -58,7 +60,14 @@ pub(crate) fn get_obfuscated_exchange_cards(
         .collect()
 }
 
-pub(crate) fn parse_uuid(s: &str) -> Result<String, Error> {
-    let parsed_uuid = Uuid::from_str(&s)?;
-    Ok(parsed_uuid.to_string())
+pub(crate) fn parse_uuid_from_payload(s: &str) -> Result<String, ValidationError> {
+    match serde_json::from_str::<IdPayload>(&s) {
+        Ok(payload) => {
+            match Uuid::from_str(&payload.id) {
+                Ok(parsed_uuid) => Ok(parsed_uuid.to_string()),
+                Err(error) => Err(ValidationError(error.to_string()))
+            }
+        }
+        Err(error) => Err(ValidationError(error.to_string()))
+    }
 }

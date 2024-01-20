@@ -18,7 +18,7 @@ pub struct GameStep<S> {
 impl<S> GameStep<S> {
     fn validate_player_has_card(&self, card: &Card, player: &str) -> GameResult<()> {
         if !&self.player_decks.get(player).unwrap().contains(card) {
-            Err(GameError::InvalidAction(format!(
+            Err(GameError(format!(
                 "Player {} does not have a card {}",
                 player, card
             )))?
@@ -63,7 +63,7 @@ mod tests {
 
         assert_eq!(
             step.validate_player_has_card(&card, &players[0]),
-            Err(GameError::InvalidAction(
+            Err(GameError(
                 "Player 1 does not have a card SPADE_2".to_string()
             ))
         );

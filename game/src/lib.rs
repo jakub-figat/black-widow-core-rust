@@ -7,5 +7,6 @@ pub mod step;
 mod r#trait;
 
 pub use card::Card;
+pub use error::{GameResult, GameError};
 pub use game::GameState::{CardExchange, RoundFinished, RoundInProgress};
 pub use game::{Game, GameSettings};

@@ -1,4 +1,4 @@
-use crate::error::GameError;
+use crate::error::{GameError, GameResult};
 use crate::game::GameState::{CardExchange, RoundFinished, RoundInProgress};
 use crate::r#trait::PayloadHandler;
 use crate::step::card_exchange::CardExchangeState;
@@ -16,17 +16,17 @@ pub struct Game {
 }
 
 impl Game {
-    pub fn from_players(players: &[String], settings: GameSettings) -> Game {
+    pub fn from_players(players: &[String], settings: GameSettings) -> GameResult<Game> {
         let number_of_players = players.len();
         if number_of_players < 3 || number_of_players > 4 {
-            panic!("Invalid number of players");
+            Err(GameError("Invalid number of players".to_string()))?
         }
 
-        Game {
+        Ok(Game {
             settings,
             players: players.to_vec(),
             state: Some(GameState::get_initial_state(players)),
-        }
+        })
     }
 
     pub fn dispatch_payload(&mut self, payload: &str, player: &str) -> Result<(), Box<dyn Error>> {
@@ -61,7 +61,7 @@ impl Game {
 
                 Ok(())
             }
-            None => Err(GameError::InvalidAction(
+            None => Err(GameError(
                 "Cannot dispatch payload, game state is not initialized".to_string(),
             ))?,
         }

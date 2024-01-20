@@ -3,18 +3,20 @@ mod handler;
 mod helper;
 mod payload;
 mod response;
+mod lobby;
+mod error;
 
 use crate::handler::handle;
 use axum::extract::ws::Message;
 use axum::routing::get;
 use axum::Router;
-use futures::{SinkExt, StreamExt};
 use game::Game;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::sync::{broadcast, RwLock};
+use crate::lobby::Lobby;
 
 pub async fn start_game_server() {
     let state = Arc::new(WebSocketGameState::new());
@@ -30,9 +32,9 @@ pub async fn start_game_server() {
     .unwrap();
 }
 
-#[derive(Debug)]
 struct WebSocketGameState {
     games: RwLock<HashMap<String, Game>>,
+    lobbies: RwLock<HashMap<String, Lobby>>,
     broadcast_sender: broadcast::Sender<Message>,
 }
 
@@ -40,6 +42,7 @@ impl WebSocketGameState {
     pub fn new() -> WebSocketGameState {
         WebSocketGameState {
             games: RwLock::new(HashMap::new()),
+            lobbies: RwLock::new(HashMap::new()),
             broadcast_sender: broadcast::channel::<Message>(128).0,
         }
     }

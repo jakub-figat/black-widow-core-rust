@@ -1,4 +1,4 @@
-use crate::helper::{broadcast_text_or_break, send_text_or_break};
+use crate::helper::{broadcast_text_or_break, send_error_or_break, send_text_or_break};
 use crate::response::{
     CardExchangeState, ErrorResponse, GameDetails, GameListResponse, RoundFinishedState,
     RoundInProgressState,
@@ -9,6 +9,9 @@ use game::{CardExchange, RoundFinished, RoundInProgress};
 use std::ops;
 use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc};
+use uuid::Uuid;
+use crate::lobby::Lobby;
+use crate::payload::MaxPlayersPayload;
 
 type ControlFlow = ops::ControlFlow<(), ()>;
 type Sender = mpsc::Sender<Message>;
@@ -30,11 +33,25 @@ pub(crate) async fn get_lobby_details(
 }
 
 pub(crate) async fn create_lobby(
+    payload: &str,
     player: &str,
+    sender: &mut Sender,
     broadcast_sender: &mut BroadcastSender,
     state: Arc<WebSocketGameState>,
 ) -> ControlFlow {
-    broadcast_text_or_break("gitara siema", broadcast_sender)
+    match serde_json::from_str::<MaxPlayersPayload>(payload) {
+        Ok(max_players_payload) => {
+            match Lobby::new_by_player(max_players_payload.max_players, player) {
+                Ok(lobby) => {
+                    let mut lobbies = state.lobbies.write().await;
+                    lobbies.insert(Uuid::new_v4().to_string(), lobby);
+                    broadcast_text_or_break("lobby created", broadcast_sender)
+                }
+                Err(error) => send_error_or_break(&error.to_string(), sender).await
+            }
+        }
+        Err(error) => send_error_or_break(&error.to_string(), sender).await
+    }
 }
 
 pub(crate) async fn join_lobby(
