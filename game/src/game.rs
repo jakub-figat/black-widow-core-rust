@@ -1,21 +1,18 @@
-use std::error::Error;
-use serde::Serialize;
 use crate::error::GameError;
 use crate::game::GameState::{CardExchange, RoundFinished, RoundInProgress};
 use crate::r#trait::PayloadHandler;
-use crate::step::{
-    GameStep
-};
 use crate::step::card_exchange::CardExchangeState;
 use crate::step::round_finished::RoundFinishedState;
 use crate::step::round_in_progress::RoundInProgressState;
-
+use crate::step::GameStep;
+use serde::Serialize;
+use std::error::Error;
 
 #[derive(Debug)]
 pub struct Game {
     pub settings: GameSettings,
     pub players: Vec<String>,
-    pub state: Option<GameState>
+    pub state: Option<GameState>,
 }
 
 impl Game {
@@ -28,7 +25,7 @@ impl Game {
         Game {
             settings,
             players: players.to_vec(),
-            state: Some(GameState::get_initial_state(players))
+            state: Some(GameState::get_initial_state(players)),
         }
     }
 
@@ -40,16 +37,16 @@ impl Game {
                         step.handle_payload(&payload, &player)?;
                         match step.should_switch() {
                             true => RoundInProgress(step.to_round_in_progress()),
-                            false => CardExchange(step)
+                            false => CardExchange(step),
                         }
-                    },
+                    }
                     RoundInProgress(mut step) => {
                         step.handle_payload(&payload, &player)?;
                         match step.should_switch() {
                             true => RoundFinished(step.to_round_finished()),
-                            false => RoundInProgress(step)
+                            false => RoundInProgress(step),
                         }
-                    },
+                    }
                     RoundFinished(mut step) => {
                         step.handle_payload(&payload, &player)?;
                         if step.game_finished(self.settings.max_score) {
@@ -57,7 +54,7 @@ impl Game {
                         }
                         match step.should_switch() {
                             true => CardExchange(step.to_card_exchange()),
-                            false => RoundFinished(step)
+                            false => RoundFinished(step),
                         }
                     }
                 });
@@ -65,8 +62,8 @@ impl Game {
                 Ok(())
             }
             None => Err(GameError::InvalidAction(
-                "Cannot dispatch payload, game state is not initialized".to_string()
-            ))?
+                "Cannot dispatch payload, game state is not initialized".to_string(),
+            ))?,
         }
     }
 }
@@ -81,9 +78,8 @@ pub struct GameSettings {
 pub enum GameState {
     CardExchange(GameStep<CardExchangeState>),
     RoundInProgress(GameStep<RoundInProgressState>),
-    RoundFinished(GameStep<RoundFinishedState>)
+    RoundFinished(GameStep<RoundFinishedState>),
 }
-
 
 impl GameState {
     fn get_initial_state(players: &[String]) -> GameState {

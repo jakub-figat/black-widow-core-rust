@@ -1,6 +1,5 @@
 use serde::Deserialize;
 
-
 #[derive(Deserialize)]
 pub(crate) enum WebSocketAction {
     #[serde(rename = "listLobbies")]
@@ -20,18 +19,17 @@ pub(crate) enum WebSocketAction {
     #[serde(rename = "gameMove")]
     GameMove,
     #[serde(rename = "quitGame")]
-    QuitGame
+    QuitGame,
 }
-
 
 #[derive(Deserialize)]
 pub(crate) struct WebSocketPayload {
     pub(crate) action: WebSocketAction,
     #[serde(default)]
-    payload: String
+    payload: String,
 }
 
 #[derive(Deserialize)]
 pub(crate) struct IdPayload {
-    id: String
+    id: String,
 }

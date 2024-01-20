@@ -1,14 +1,15 @@
-use std::collections::{HashMap, HashSet};
-use std::error::Error;
 use crate::card::Card;
 use crate::card::CardSuit::Club;
 use crate::error::{GameError, GameResult};
-use crate::helper::{get_player_to_player_map, get_starting_player_decks, pick_player_with_starting_card};
+use crate::helper::{
+    get_player_to_player_map, get_starting_player_decks, pick_player_with_starting_card,
+};
 use crate::payload::CardExchangePayload;
 use crate::r#trait::PayloadHandler;
-use crate::step::GameStep;
 use crate::step::round_in_progress::RoundInProgressState;
-
+use crate::step::GameStep;
+use std::collections::{HashMap, HashSet};
+use std::error::Error;
 
 impl GameStep<CardExchangeState> {
     pub fn initialize_from_players(players: &[String]) -> GameStep<CardExchangeState> {
@@ -17,7 +18,7 @@ impl GameStep<CardExchangeState> {
             player_to_player_map: get_player_to_player_map(&players),
             scores: HashMap::new(),
             player_decks: get_starting_player_decks(&players),
-            state: CardExchangeState::new()
+            state: CardExchangeState::new(),
         }
     }
 
@@ -27,12 +28,13 @@ impl GameStep<CardExchangeState> {
             player_to_player_map: get_player_to_player_map(&players),
             scores: HashMap::new(),
             player_decks: HashMap::from_iter(
-                players.iter()
+                players
+                    .iter()
                     .cloned()
                     .map(|player| (player, HashSet::new()))
-                    .collect::<HashMap<_, _>>()
+                    .collect::<HashMap<_, _>>(),
             ),
-            state: CardExchangeState::new()
+            state: CardExchangeState::new(),
         }
     }
 
@@ -44,12 +46,15 @@ impl GameStep<CardExchangeState> {
         self.exchange_cards_between_players();
 
         let (player, starting_card) = pick_player_with_starting_card(&self.player_decks).unwrap();
-        self.player_decks.get_mut(&player).unwrap().remove(&starting_card);
+        self.player_decks
+            .get_mut(&player)
+            .unwrap()
+            .remove(&starting_card);
 
         let state = RoundInProgressState {
             current_player: self.player_to_player_map.get(&player).unwrap().to_string(),
             table_suit: Some(Club),
-            cards_on_table: HashMap::from([(player, starting_card)])
+            cards_on_table: HashMap::from([(player, starting_card)]),
         };
 
         GameStep {
@@ -57,7 +62,7 @@ impl GameStep<CardExchangeState> {
             player_to_player_map: self.player_to_player_map,
             scores: self.scores,
             player_decks: self.player_decks,
-            state
+            state,
         }
     }
 
@@ -66,24 +71,22 @@ impl GameStep<CardExchangeState> {
         for (from_player, to_player) in &self.player_to_player_map {
             for card in &self.state.cards_to_exchange[from_player] {
                 player_decks.get_mut(from_player).unwrap().remove(card);
-                player_decks.get_mut(to_player).unwrap().insert(card.clone());
+                player_decks
+                    .get_mut(to_player)
+                    .unwrap()
+                    .insert(card.clone());
             }
         }
     }
 }
 
 impl PayloadHandler<'_, CardExchangePayload> for GameStep<CardExchangeState> {
-    fn validate_payload(
-        &self,
-        payload: &CardExchangePayload,
-        player: &str,
-    ) -> GameResult<()> {
+    fn validate_payload(&self, payload: &CardExchangePayload, player: &str) -> GameResult<()> {
         if self.state.cards_to_exchange.get(player).is_some() {
-            Err(
-                GameError::InvalidAction(
-                    format!("Player {} has already declared cards for exchange", player)
-                )
-            )?
+            Err(GameError::InvalidAction(format!(
+                "Player {} has already declared cards for exchange",
+                player
+            )))?
         }
 
         for card in &payload.cards_to_exchange {
@@ -93,49 +96,38 @@ impl PayloadHandler<'_, CardExchangePayload> for GameStep<CardExchangeState> {
         Ok(())
     }
 
-    fn dispatch_payload(
-        &mut self,
-        payload: &CardExchangePayload,
-        player: &str
-    ) {
-        self.state.cards_to_exchange.insert(
-            player.to_string(), payload.cards_to_exchange.clone()
-        );
+    fn dispatch_payload(&mut self, payload: &CardExchangePayload, player: &str) {
+        self.state
+            .cards_to_exchange
+            .insert(player.to_string(), payload.cards_to_exchange.clone());
     }
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct CardExchangeState {
-    pub cards_to_exchange: HashMap<String, HashSet<Card>>
+    pub cards_to_exchange: HashMap<String, HashSet<Card>>,
 }
 
 impl CardExchangeState {
     pub fn new() -> CardExchangeState {
-        CardExchangeState {cards_to_exchange: HashMap::new()}
+        CardExchangeState {
+            cards_to_exchange: HashMap::new(),
+        }
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use crate::card::CardSuit::Spade;
     use super::*;
+    use crate::card::CardSuit::Spade;
 
     fn get_players() -> Vec<String> {
-        vec![
-            "1".to_string(),
-            "2".to_string(),
-            "3".to_string()
-        ]
+        vec!["1".to_string(), "2".to_string(), "3".to_string()]
     }
 
     fn get_decks_of_three_cards() -> Vec<HashSet<Card>> {
         vec![
-            HashSet::from([
-                Card::new(Spade, 2),
-                Card::new(Club, 3),
-                Card::new(Spade, 4),
-            ]),
+            HashSet::from([Card::new(Spade, 2), Card::new(Club, 3), Card::new(Spade, 4)]),
             HashSet::from([
                 Card::new(Spade, 5),
                 Card::new(Spade, 6),
@@ -149,70 +141,76 @@ mod tests {
         ]
     }
 
-    fn insert_decks_of_cards(step: &mut GameStep<CardExchangeState>, decks_of_cards: &Vec<HashSet<Card>>) {
-        step.player_decks.insert("1".to_string(), decks_of_cards[0].clone());
-        step.player_decks.insert("2".to_string(), decks_of_cards[1].clone());
-        step.player_decks.insert("3".to_string(), decks_of_cards[2].clone());
+    fn insert_decks_of_cards(
+        step: &mut GameStep<CardExchangeState>,
+        decks_of_cards: &Vec<HashSet<Card>>,
+    ) {
+        step.player_decks
+            .insert("1".to_string(), decks_of_cards[0].clone());
+        step.player_decks
+            .insert("2".to_string(), decks_of_cards[1].clone());
+        step.player_decks
+            .insert("3".to_string(), decks_of_cards[2].clone());
     }
 
     #[test]
     fn validate_payload_returns_error_when_player_already_placed_cards_for_exchange() {
         let players = get_players();
         let mut step = GameStep::empty_from_players(&players);
-        let cards = HashSet::from(
-            [
-                Card::new(Spade, 2),
-                Card::new(Spade, 3),
-                Card::new(Spade, 4)
-            ]
-        );
+        let cards = HashSet::from([
+            Card::new(Spade, 2),
+            Card::new(Spade, 3),
+            Card::new(Spade, 4),
+        ]);
 
-        step.state.cards_to_exchange.insert("1".to_string(), cards.clone());
+        step.state
+            .cards_to_exchange
+            .insert("1".to_string(), cards.clone());
         let payload = CardExchangePayload::from_cards(&cards).unwrap();
 
         assert_eq!(
             step.validate_payload(&payload, &players[0]),
-            Err(
-                GameError::InvalidAction("Player 1 has already declared cards for exchange".to_string())
-            )
+            Err(GameError::InvalidAction(
+                "Player 1 has already declared cards for exchange".to_string()
+            ))
         )
     }
 
     #[test]
     fn player_1_dispatch_payload() {
         let players = get_players();
-        let cards = HashSet::from(
-            [
-                Card::new(Spade, 2),
-                Card::new(Spade, 3),
-                Card::new(Spade, 4),
-            ]
-        );
+        let cards = HashSet::from([
+            Card::new(Spade, 2),
+            Card::new(Spade, 3),
+            Card::new(Spade, 4),
+        ]);
         let payload = CardExchangePayload::from_cards(&cards).unwrap();
         let mut step = GameStep::empty_from_players(&players);
         step.dispatch_payload(&payload, &players[0]);
 
         assert_eq!(
             step.state.cards_to_exchange,
-            HashMap::from(
-                [
-                    ("1".to_string(), cards),
-                ]
-            )
+            HashMap::from([("1".to_string(), cards),])
         );
     }
-    
+
     #[test]
     fn should_switch_returns_true_when_all_players_have_placed_their_cards() {
         let players = get_players();
         let vec_of_cards = get_decks_of_three_cards();
-        
+
         let mut step = GameStep::empty_from_players(&players);
         insert_decks_of_cards(&mut step, &vec_of_cards);
 
-        step.state.cards_to_exchange.insert("1".to_string(), vec_of_cards[0].clone());
-        step.state.cards_to_exchange.insert("2".to_string(), vec_of_cards[1].clone());
-        step.state.cards_to_exchange.insert("3".to_string(), vec_of_cards[2].clone());
+        step.state
+            .cards_to_exchange
+            .insert("1".to_string(), vec_of_cards[0].clone());
+        step.state
+            .cards_to_exchange
+            .insert("2".to_string(), vec_of_cards[1].clone());
+        step.state
+            .cards_to_exchange
+            .insert("3".to_string(), vec_of_cards[2].clone());
 
         assert!(step.should_switch())
     }
@@ -225,18 +223,22 @@ mod tests {
         let mut step = GameStep::empty_from_players(&players);
         insert_decks_of_cards(&mut step, &vec_of_cards);
 
-        step.state.cards_to_exchange.insert("1".to_string(), vec_of_cards[0].clone());
-        step.state.cards_to_exchange.insert("2".to_string(), vec_of_cards[1].clone());
-        step.state.cards_to_exchange.insert("3".to_string(), vec_of_cards[2].clone());
+        step.state
+            .cards_to_exchange
+            .insert("1".to_string(), vec_of_cards[0].clone());
+        step.state
+            .cards_to_exchange
+            .insert("2".to_string(), vec_of_cards[1].clone());
+        step.state
+            .cards_to_exchange
+            .insert("3".to_string(), vec_of_cards[2].clone());
         step.exchange_cards_between_players();
 
-        let expected_decks = HashMap::from(
-            [
-                ("1".to_string(), HashSet::from(vec_of_cards[2].clone())),
-                ("2".to_string(), HashSet::from(vec_of_cards[0].clone())),
-                ("3".to_string(), HashSet::from(vec_of_cards[1].clone())),
-            ]
-        );
+        let expected_decks = HashMap::from([
+            ("1".to_string(), HashSet::from(vec_of_cards[2].clone())),
+            ("2".to_string(), HashSet::from(vec_of_cards[0].clone())),
+            ("3".to_string(), HashSet::from(vec_of_cards[1].clone())),
+        ]);
         assert_eq!(step.player_decks, expected_decks);
     }
 
@@ -248,9 +250,15 @@ mod tests {
         let mut step = GameStep::empty_from_players(&players);
         insert_decks_of_cards(&mut step, &vec_of_cards);
 
-        step.state.cards_to_exchange.insert("1".to_string(), vec_of_cards[0].clone());
-        step.state.cards_to_exchange.insert("2".to_string(), vec_of_cards[1].clone());
-        step.state.cards_to_exchange.insert("3".to_string(), vec_of_cards[2].clone());
+        step.state
+            .cards_to_exchange
+            .insert("1".to_string(), vec_of_cards[0].clone());
+        step.state
+            .cards_to_exchange
+            .insert("2".to_string(), vec_of_cards[1].clone());
+        step.state
+            .cards_to_exchange
+            .insert("3".to_string(), vec_of_cards[2].clone());
 
         let round_in_progress_step = step.to_round_in_progress();
 

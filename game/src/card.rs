@@ -1,6 +1,6 @@
+use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Deserialize, Serialize)]
 pub enum CardSuit {
@@ -11,7 +11,7 @@ pub enum CardSuit {
     #[serde(rename = "heart")]
     Heart,
     #[serde(rename = "diamond")]
-    Diamond
+    Diamond,
 }
 
 impl Display for CardSuit {
@@ -20,18 +20,17 @@ impl Display for CardSuit {
             CardSuit::Spade => "SPADE",
             CardSuit::Club => "CLUB",
             CardSuit::Heart => "HEART",
-            CardSuit::Diamond => "DIAMOND"
+            CardSuit::Diamond => "DIAMOND",
         };
         write!(f, "{}", name)
     }
 }
 
-
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Deserialize, Serialize)]
 pub struct Card {
     pub suit: CardSuit,
     pub value: usize,
-    pub score: usize
+    pub score: usize,
 }
 
 impl Display for Card {
@@ -42,7 +41,7 @@ impl Display for Card {
             12 => "QUEEN",
             13 => "KING",
             14 => "ACE",
-            _ => temp_other.as_str()
+            _ => temp_other.as_str(),
         };
         write!(f, "{}_{}", &self.suit, value)
     }
@@ -62,22 +61,18 @@ impl Card {
 
         let score = match suit {
             CardSuit::Heart => 1,
-            CardSuit::Spade => {
-                match value {
-                    12 => 13,
-                    13 => 10,
-                    14 => 7,
-                    _ => 0
-                }
+            CardSuit::Spade => match value {
+                12 => 13,
+                13 => 10,
+                14 => 7,
+                _ => 0,
             },
-            _ => 0
+            _ => 0,
         };
 
-        Card {suit, value ,score}
+        Card { suit, value, score }
     }
 }
-
-
 
 #[cfg(test)]
 mod tests {

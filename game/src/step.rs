@@ -1,11 +1,10 @@
-use std::collections::{HashMap, HashSet};
 use crate::card::{Card, CardSuit};
 use crate::error::{GameError, GameResult};
+use std::collections::{HashMap, HashSet};
 
 pub mod card_exchange;
-pub mod round_in_progress;
 pub mod round_finished;
-
+pub mod round_in_progress;
 
 #[derive(Debug, Clone)]
 pub struct GameStep<S> {
@@ -13,48 +12,47 @@ pub struct GameStep<S> {
     pub player_to_player_map: HashMap<String, String>,
     pub scores: HashMap<String, usize>,
     pub player_decks: HashMap<String, HashSet<Card>>,
-    pub state: S
+    pub state: S,
 }
 
 impl<S> GameStep<S> {
     fn validate_player_has_card(&self, card: &Card, player: &str) -> GameResult<()> {
         if !&self.player_decks.get(player).unwrap().contains(card) {
-            Err(
-                GameError::InvalidAction(
-                    format!("Player {} does not have a card {}", player, card)
-                )
-            )?
+            Err(GameError::InvalidAction(format!(
+                "Player {} does not have a card {}",
+                player, card
+            )))?
         }
 
         Ok(())
     }
 
     fn check_if_player_has_only_one_suit_remaining(&self, player: &str, suit: CardSuit) -> bool {
-        self.player_decks.get(player).unwrap().iter()
+        self.player_decks
+            .get(player)
+            .unwrap()
+            .iter()
             .all(|card| card.suit == suit)
     }
 
     fn check_if_player_has_suit(&self, player: &str, suit: CardSuit) -> bool {
-        self.player_decks.get(player).unwrap().iter()
+        self.player_decks
+            .get(player)
+            .unwrap()
+            .iter()
             .any(|card| card.suit == suit)
-
     }
 }
 
-
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::card::CardSuit::{Club, Spade};
     use crate::payload::{CardExchangePayload, PlaceCardPayload};
     use crate::r#trait::PayloadHandler;
-    use super::*;
 
     fn get_players() -> Vec<String> {
-        vec![
-            "1".to_string(),
-            "2".to_string(),
-            "3".to_string()
-        ]
+        vec!["1".to_string(), "2".to_string(), "3".to_string()]
     }
 
     #[test]
@@ -65,9 +63,9 @@ mod tests {
 
         assert_eq!(
             step.validate_player_has_card(&card, &players[0]),
-            Err(
-                GameError::InvalidAction("Player 1 does not have a card SPADE_2".to_string())
-            )
+            Err(GameError::InvalidAction(
+                "Player 1 does not have a card SPADE_2".to_string()
+            ))
         );
     }
 
@@ -77,58 +75,44 @@ mod tests {
         let mut step = GameStep::empty_from_players(&players);
         let card = Card::new(Spade, 2);
 
-        step.player_decks.get_mut(&players[0]).unwrap().insert(card.clone());
+        step.player_decks
+            .get_mut(&players[0])
+            .unwrap()
+            .insert(card.clone());
 
-        assert_eq!(
-            step.validate_player_has_card(&card, &players[0]),
-            Ok(())
-        );
+        assert_eq!(step.validate_player_has_card(&card, &players[0]), Ok(()));
     }
 
     #[test]
     fn play_all_steps() {
         let players = get_players();
         let mut exchange_step = GameStep::empty_from_players(&players);
-        let initial_decks = HashMap::from(
-            [
-                (
-                    "1".to_string(),
-                    HashSet::from(
-                        [
-                            Card::new(Club, 6),
-                            Card::new(Spade, 7),
-                            Card::new(Spade, 8)
-                        ]
-                    )
-                ),
-                (
-                    "2".to_string(),
-                    HashSet::from(
-                        [
-                            Card::new(Club, 9),
-                            Card::new(Spade, 10),
-                            Card::new(Spade, 12)
-                        ]
-                    )
-                ),
-                (
-                    "3".to_string(),
-                    HashSet::from(
-                        [
-                            Card::new(Club, 3),
-                            Card::new(Spade, 4),
-                            Card::new(Spade, 5)
-                        ]
-                    )
-                )
-            ]
-        );
+        let initial_decks = HashMap::from([
+            (
+                "1".to_string(),
+                HashSet::from([Card::new(Club, 6), Card::new(Spade, 7), Card::new(Spade, 8)]),
+            ),
+            (
+                "2".to_string(),
+                HashSet::from([
+                    Card::new(Club, 9),
+                    Card::new(Spade, 10),
+                    Card::new(Spade, 12),
+                ]),
+            ),
+            (
+                "3".to_string(),
+                HashSet::from([Card::new(Club, 3), Card::new(Spade, 4), Card::new(Spade, 5)]),
+            ),
+        ]);
 
         exchange_step.player_decks = initial_decks.clone();
 
         // card exchange
         for (player, cards) in initial_decks {
-            let payload = CardExchangePayload {cards_to_exchange: cards};
+            let payload = CardExchangePayload {
+                cards_to_exchange: cards,
+            };
             exchange_step.validate_payload(&payload, &player).unwrap();
             exchange_step.dispatch_payload(&payload, &player);
         }
@@ -143,15 +127,22 @@ mod tests {
         // ]
         let mut round_in_progress_step = exchange_step.to_round_in_progress();
 
-        let payload = PlaceCardPayload {card: Card::new(Club, 6)};
-        round_in_progress_step.validate_payload(&payload, "2").unwrap();
+        let payload = PlaceCardPayload {
+            card: Card::new(Club, 6),
+        };
+        round_in_progress_step
+            .validate_payload(&payload, "2")
+            .unwrap();
         round_in_progress_step.dispatch_payload(&payload, "2");
 
-        let payload = PlaceCardPayload {card: Card::new(Club, 9)};
-        round_in_progress_step.validate_payload(&payload, "3").unwrap();
+        let payload = PlaceCardPayload {
+            card: Card::new(Club, 9),
+        };
+        round_in_progress_step
+            .validate_payload(&payload, "3")
+            .unwrap();
         round_in_progress_step.dispatch_payload(&payload, "3");
         assert_eq!(round_in_progress_step.state.current_player, "3".to_string());
-
 
         // 2 round
         // current_decks: [
@@ -159,21 +150,32 @@ mod tests {
         //     2: [spade_7, spade_8],
         //     3: [spade_10, spade_12], <- turn
         // ]
-        let payload = PlaceCardPayload {card: Card::new(Spade, 12)};
-        round_in_progress_step.validate_payload(&payload, "3").unwrap();
+        let payload = PlaceCardPayload {
+            card: Card::new(Spade, 12),
+        };
+        round_in_progress_step
+            .validate_payload(&payload, "3")
+            .unwrap();
         round_in_progress_step.dispatch_payload(&payload, "3");
 
-        let payload = PlaceCardPayload {card: Card::new(Spade, 4)};
-        round_in_progress_step.validate_payload(&payload, "1").unwrap();
+        let payload = PlaceCardPayload {
+            card: Card::new(Spade, 4),
+        };
+        round_in_progress_step
+            .validate_payload(&payload, "1")
+            .unwrap();
         round_in_progress_step.dispatch_payload(&payload, "1");
 
-        let payload = PlaceCardPayload {card: Card::new(Spade, 7)};
-        round_in_progress_step.validate_payload(&payload, "2").unwrap();
+        let payload = PlaceCardPayload {
+            card: Card::new(Spade, 7),
+        };
+        round_in_progress_step
+            .validate_payload(&payload, "2")
+            .unwrap();
         round_in_progress_step.dispatch_payload(&payload, "2");
 
         assert_eq!(round_in_progress_step.state.current_player, "3".to_string());
         assert_eq!(round_in_progress_step.scores["3"], 13);
-
 
         // 3 round
         // current_decks: [
@@ -181,19 +183,30 @@ mod tests {
         //     2: [spade_8],
         //     3: [spade_10], <- turn
         // ]
-        let payload = PlaceCardPayload {card: Card::new(Spade, 10)};
-        round_in_progress_step.validate_payload(&payload, "3").unwrap();
+        let payload = PlaceCardPayload {
+            card: Card::new(Spade, 10),
+        };
+        round_in_progress_step
+            .validate_payload(&payload, "3")
+            .unwrap();
         round_in_progress_step.dispatch_payload(&payload, "3");
 
-        let payload = PlaceCardPayload {card: Card::new(Spade, 5)};
-        round_in_progress_step.validate_payload(&payload, "1").unwrap();
+        let payload = PlaceCardPayload {
+            card: Card::new(Spade, 5),
+        };
+        round_in_progress_step
+            .validate_payload(&payload, "1")
+            .unwrap();
         round_in_progress_step.dispatch_payload(&payload, "1");
 
-        let payload = PlaceCardPayload {card: Card::new(Spade, 8)};
-        round_in_progress_step.validate_payload(&payload, "2").unwrap();
+        let payload = PlaceCardPayload {
+            card: Card::new(Spade, 8),
+        };
+        round_in_progress_step
+            .validate_payload(&payload, "2")
+            .unwrap();
         round_in_progress_step.dispatch_payload(&payload, "2");
         assert!(round_in_progress_step.should_switch());
-
 
         // game finished
         let round_finished_step = round_in_progress_step.to_round_finished();

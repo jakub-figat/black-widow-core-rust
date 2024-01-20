@@ -1,11 +1,11 @@
 mod card;
-pub mod step;
-pub mod game;
-mod payload;
 mod error;
+pub mod game;
 mod helper;
+mod payload;
+pub mod step;
 mod r#trait;
 
-pub use game::{Game, GameSettings};
-pub use game::GameState::{CardExchange, RoundInProgress, RoundFinished};
 pub use card::Card;
+pub use game::GameState::{CardExchange, RoundFinished, RoundInProgress};
+pub use game::{Game, GameSettings};

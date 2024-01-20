@@ -1,6 +1,6 @@
-use std::error::Error;
+use crate::error::GameResult;
 use serde::Deserialize;
-use crate::error::{GameResult};
+use std::error::Error;
 
 pub trait PayloadHandler<'a, P: Deserialize<'a>> {
     fn validate_payload(&self, payload: &P, player: &str) -> GameResult<()>;
