@@ -1,7 +1,9 @@
-use crate::helper::{broadcast_text_or_break, send_error_or_break, send_text_or_break};
+use crate::lobby::Lobby;
+use crate::network::{broadcast_text_or_break, send_error_or_break, send_text_or_break};
+use crate::payload::MaxPlayersPayload;
 use crate::response::{
-    CardExchangeState, ErrorResponse, GameDetails, GameListResponse, RoundFinishedState,
-    RoundInProgressState,
+    CardExchangeState, ErrorResponse, GameDetailsResponse, GameListResponse, LobbyDetailsResponse,
+    LobbyListResponse, RoundFinishedState, RoundInProgressState, ToJson,
 };
 use crate::WebSocketGameState;
 use axum::extract::ws::Message;
@@ -10,8 +12,6 @@ use std::ops;
 use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc};
 use uuid::Uuid;
-use crate::lobby::Lobby;
-use crate::payload::MaxPlayersPayload;
 
 type ControlFlow = ops::ControlFlow<(), ()>;
 type Sender = mpsc::Sender<Message>;
@@ -21,6 +21,9 @@ pub(crate) async fn list_lobbies(
     sender: &mut Sender,
     state: Arc<WebSocketGameState>,
 ) -> ControlFlow {
+    let lobbies = state.lobbies.read().await;
+    let response = LobbyListResponse::new(&lobbies);
+    send_text_or_break(&response.to_json(), sender).await;
     ControlFlow::Continue(())
 }
 
@@ -29,7 +32,14 @@ pub(crate) async fn get_lobby_details(
     sender: &mut Sender,
     state: Arc<WebSocketGameState>,
 ) -> ControlFlow {
-    ControlFlow::Continue(())
+    let lobbies = state.lobbies.read().await;
+    match lobbies.get(id) {
+        Some(lobby) => {
+            let response = LobbyDetailsResponse::new(lobby);
+            send_text_or_break(&response.to_json(), sender).await
+        }
+        None => send_error_or_break(&format!("Lobby with id {} not found", &id), sender).await,
+    }
 }
 
 pub(crate) async fn create_lobby(
@@ -44,13 +54,14 @@ pub(crate) async fn create_lobby(
             match Lobby::new_by_player(max_players_payload.max_players, player) {
                 Ok(lobby) => {
                     let mut lobbies = state.lobbies.write().await;
-                    lobbies.insert(Uuid::new_v4().to_string(), lobby);
-                    broadcast_text_or_break("lobby created", broadcast_sender)
+                    lobbies.insert(Uuid::new_v4().to_string(), lobby.clone());
+                    let response = LobbyDetailsResponse::new(&lobby);
+                    broadcast_text_or_break(&response.to_json(), broadcast_sender)
                 }
-                Err(error) => send_error_or_break(&error.to_string(), sender).await
+                Err(error) => send_error_or_break(&error.to_string(), sender).await,
             }
         }
-        Err(error) => send_error_or_break(&error.to_string(), sender).await
+        Err(error) => send_error_or_break(&error.to_string(), sender).await,
     }
 }
 
@@ -61,7 +72,19 @@ pub(crate) async fn join_lobby(
     broadcast_sender: &mut BroadcastSender,
     state: Arc<WebSocketGameState>,
 ) -> ControlFlow {
-    ControlFlow::Continue(())
+    let mut lobbies = state.lobbies.write().await;
+    match lobbies.get_mut(id) {
+        Some(lobby) => {
+            lobby.players.push(player.to_string());
+            if lobby.players.len() == lobby.max_players {}
+            // TODO: some game magic required
+            // theres a need to store player: channel mapping to selectively broadcast
+
+            let response = LobbyDetailsResponse::new(&lobby);
+            broadcast_text_or_break(&response.to_json(), broadcast_sender)
+        }
+        None => send_error_or_break(&format!("Lobby with id {} not found", &id), sender).await,
+    }
 }
 
 pub(crate) async fn quit_lobby(
@@ -90,11 +113,15 @@ pub(crate) async fn get_game_details(
     let response = match game_hashmap.get(id) {
         Some(game) => match game.players.iter().find(|&s| s.as_str() == player) {
             Some(_) => match game.state.as_ref().unwrap() {
-                CardExchange(_) => GameDetails::<CardExchangeState>::json_from_game(game, player),
-                RoundInProgress(_) => {
-                    GameDetails::<RoundInProgressState>::json_from_game(game, player)
+                CardExchange(_) => {
+                    GameDetailsResponse::<CardExchangeState>::json_from_game(id, game, player)
                 }
-                RoundFinished(_) => GameDetails::<RoundFinishedState>::json_from_game(game, player),
+                RoundInProgress(_) => {
+                    GameDetailsResponse::<RoundInProgressState>::json_from_game(id, game, player)
+                }
+                RoundFinished(_) => {
+                    GameDetailsResponse::<RoundFinishedState>::json_from_game(id, game, player)
+                }
             },
             None => {
                 ErrorResponse::json_from_detail(&format!("You don't belong to game with id {}", id))
@@ -125,7 +152,4 @@ pub(crate) async fn quit_game(
     ControlFlow::Continue(())
 }
 
-// TODO:
-// add lobbies, without them sending game state is nightmare
-// ws auth
-// maybe redis for shared state if scaling instances
+// TODO: maybe redis for shared state if scaling instances

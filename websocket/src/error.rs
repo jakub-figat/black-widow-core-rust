@@ -3,7 +3,6 @@ use std::error::Error;
 #[derive(Debug)]
 pub(crate) struct ValidationError(pub String);
 
-
 impl std::fmt::Display for ValidationError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", self.0)

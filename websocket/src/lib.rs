@@ -1,12 +1,14 @@
+mod error;
 mod game_action;
 mod handler;
 mod helper;
+mod lobby;
+mod network;
 mod payload;
 mod response;
-mod lobby;
-mod error;
 
 use crate::handler::handle;
+use crate::lobby::Lobby;
 use axum::extract::ws::Message;
 use axum::routing::get;
 use axum::Router;
@@ -16,7 +18,6 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::sync::{broadcast, RwLock};
-use crate::lobby::Lobby;
 
 pub async fn start_game_server() {
     let state = Arc::new(WebSocketGameState::new());

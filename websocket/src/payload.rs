@@ -37,5 +37,5 @@ pub(crate) struct IdPayload {
 #[derive(Deserialize)]
 pub(crate) struct MaxPlayersPayload {
     #[serde(rename = "maxPlayers")]
-    pub(crate) max_players: usize
+    pub(crate) max_players: usize,
 }
