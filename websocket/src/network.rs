@@ -36,10 +36,10 @@ pub(crate) async fn broadcast_text_to_players_or_break(
     players: &[String],
     state: Arc<WebSocketState>,
 ) -> ControlFlow {
-    let mut player_connections = state.player_connections.write().await;
+    let player_connections = state.player_connections.read().await;
     for player in players {
-        let sender = player_connections.get_mut(player).unwrap();
-        send_text_or_break(text, sender).await?
+        let mut sender = player_connections.get(player).unwrap().clone();
+        send_text_or_break(text, &mut sender).await?
     }
     ControlFlow::Continue(())
 }
@@ -49,10 +49,10 @@ pub(crate) async fn broadcast_game_to_players_or_break(
     game: &Game,
     state: Arc<WebSocketState>,
 ) -> ControlFlow {
-    let mut player_connections = state.player_connections.write().await;
+    let player_connections = state.player_connections.read().await;
     for player in &game.players {
-        let sender = player_connections.get_mut(player).unwrap();
-        send_text_or_break(&game_to_json(id, game, player), sender).await?
+        let mut sender = player_connections.get(player).unwrap().clone();
+        send_text_or_break(&game_to_json(id, game, player), &mut sender).await?
     }
     ControlFlow::Continue(())
 }
