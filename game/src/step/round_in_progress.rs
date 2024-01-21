@@ -81,10 +81,9 @@ impl GameStep<RoundInProgressState> {
         let score = self.get_total_score_of_cards_on_table();
 
         *self.scores.entry(scoring_player.clone()).or_insert(0) += score;
-        self.state.current_player = scoring_player;
-
         self.state.cards_on_table = HashMap::new();
         self.state.table_suit = None;
+        self.state.current_player = scoring_player;
     }
 
     pub fn should_switch(&self) -> bool {

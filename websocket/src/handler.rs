@@ -5,7 +5,6 @@ use crate::game_action::{
 use crate::helper::parse_uuid_from_payload;
 use crate::network::{send_error_or_break, send_text_or_break};
 use crate::payload::{WebSocketAction::*, WebSocketPayload};
-use crate::response::ErrorResponse;
 use crate::WebSocketState;
 use axum::extract::ws::{Message, WebSocket};
 use axum::extract::{State, WebSocketUpgrade};
@@ -22,12 +21,12 @@ pub(crate) async fn handle(
 ) -> impl IntoResponse {
     // TODO: implement decoding JWT here
     let user = "1".to_string();
-    websocket.on_upgrade(move |socket| handle_websocket(user, socket, state))
+    websocket.on_upgrade(move |socket| handle_websocket(socket, user, state))
 }
 
 pub(crate) async fn handle_websocket(
-    user: String,
     websocket: WebSocket,
+    user: String,
     state: Arc<WebSocketState>,
 ) {
     let (sink, stream) = websocket.split();
@@ -50,7 +49,7 @@ pub(crate) async fn handle_websocket(
         _ = &mut receiver_task => broadcast_receiver_task.abort(),
         _ = &mut broadcast_receiver_task => receiver_task.abort()
     }
-
+    // TODO: test reconnecting
     let mut player_connections = state.player_connections.write().await;
     player_connections.remove(&user);
 }

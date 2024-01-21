@@ -17,13 +17,13 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpListener;
-use tokio::sync::{broadcast, mpsc, RwLock};
+use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
 
 pub async fn start_game_server() {
     let state = Arc::new(WebSocketState::new());
     let app = Router::new().route("/ws", get(handle)).with_state(state);
 
-    println!("starting...");
+    println!("Starting server on port 6379");
     let listener = TcpListener::bind("127.0.0.1:6379").await.unwrap();
     axum::serve(
         listener,
@@ -34,8 +34,8 @@ pub async fn start_game_server() {
 }
 
 struct WebSocketState {
-    games: RwLock<HashMap<String, Game>>,
-    lobbies: RwLock<HashMap<String, Lobby>>,
+    games: Mutex<HashMap<String, Game>>,
+    lobbies: Mutex<HashMap<String, Lobby>>,
     player_connections: RwLock<HashMap<String, mpsc::Sender<Message>>>,
     broadcast_sender: broadcast::Sender<Message>,
 }
@@ -43,8 +43,8 @@ struct WebSocketState {
 impl WebSocketState {
     pub fn new() -> WebSocketState {
         WebSocketState {
-            games: RwLock::new(HashMap::new()),
-            lobbies: RwLock::new(HashMap::new()),
+            games: Mutex::new(HashMap::new()),
+            lobbies: Mutex::new(HashMap::new()),
             player_connections: RwLock::new(HashMap::new()),
             broadcast_sender: broadcast::channel::<Message>(128).0,
         }
