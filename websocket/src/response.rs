@@ -114,36 +114,6 @@ pub(crate) struct GameDetailsResponse<S: Serialize> {
 }
 
 impl<S: Serialize> GameDetailsResponse<S> {
-    pub(crate) fn json_from_game(id: &str, game: &Game, player: &str) -> String {
-        match game.state.as_ref().unwrap() {
-            CardExchange(step) => {
-                let state = CardExchangeState {
-                    player_exchange_cards: get_obfuscated_exchange_cards(
-                        &step.state.cards_to_exchange,
-                        player,
-                    ),
-                    your_exchange_cards: step.state.cards_to_exchange[player].clone(),
-                };
-                let obfuscated_game = ObfuscatedGame::new(game, &step, state, player);
-                GameDetailsResponse::json_from_obfuscated_game_state(id, obfuscated_game)
-            }
-            RoundInProgress(step) => {
-                let state = RoundInProgressState {
-                    cards_on_table: step.state.cards_on_table.clone(),
-                };
-                let obfuscated_game = ObfuscatedGame::new(game, &step, state, player);
-                GameDetailsResponse::json_from_obfuscated_game_state(id, obfuscated_game)
-            }
-            RoundFinished(step) => {
-                let state = RoundFinishedState {
-                    players_ready: step.state.players_ready.clone(),
-                };
-                let obfuscated_game = ObfuscatedGame::new(game, &step, state, player);
-                GameDetailsResponse::json_from_obfuscated_game_state(id, obfuscated_game)
-            }
-        }
-    }
-
     fn json_from_obfuscated_game_state(id: &str, game: ObfuscatedGame<S>) -> String {
         let response = GameDetailsResponse {
             response_type: ResponseType::GameDetails,
@@ -151,6 +121,36 @@ impl<S: Serialize> GameDetailsResponse<S> {
             game,
         };
         serde_json::to_string(&response).unwrap()
+    }
+}
+
+pub(crate) fn game_to_json(id: &str, game: &Game, player: &str) -> String {
+    match game.state.as_ref().unwrap() {
+        CardExchange(step) => {
+            let state = CardExchangeState {
+                player_exchange_cards: get_obfuscated_exchange_cards(
+                    &step.state.cards_to_exchange,
+                    player,
+                ),
+                your_exchange_cards: step.state.cards_to_exchange[player].clone(),
+            };
+            let obfuscated_game = ObfuscatedGame::new(game, &step, state, player);
+            GameDetailsResponse::json_from_obfuscated_game_state(id, obfuscated_game)
+        }
+        RoundInProgress(step) => {
+            let state = RoundInProgressState {
+                cards_on_table: step.state.cards_on_table.clone(),
+            };
+            let obfuscated_game = ObfuscatedGame::new(game, &step, state, player);
+            GameDetailsResponse::json_from_obfuscated_game_state(id, obfuscated_game)
+        }
+        RoundFinished(step) => {
+            let state = RoundFinishedState {
+                players_ready: step.state.players_ready.clone(),
+            };
+            let obfuscated_game = ObfuscatedGame::new(game, &step, state, player);
+            GameDetailsResponse::json_from_obfuscated_game_state(id, obfuscated_game)
+        }
     }
 }
 

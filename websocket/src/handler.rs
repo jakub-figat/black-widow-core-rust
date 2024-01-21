@@ -5,9 +5,11 @@ use crate::game_action::{
 use crate::helper::parse_uuid_from_payload;
 use crate::network::{send_error_or_break, send_text_or_break};
 use crate::payload::{WebSocketAction::*, WebSocketPayload};
-use crate::WebSocketGameState;
+use crate::WebSocketState;
+use axum::body::Body;
 use axum::extract::ws::{Message, WebSocket};
 use axum::extract::{State, WebSocketUpgrade};
+use axum::http::{Response, StatusCode};
 use axum::response::IntoResponse;
 use futures::{SinkExt, StreamExt};
 use std::ops::ControlFlow;
@@ -16,20 +18,36 @@ use tokio::sync::{broadcast, mpsc};
 
 pub(crate) async fn handle(
     websocket: WebSocketUpgrade,
-    State(state): State<Arc<WebSocketGameState>>,
+    State(state): State<Arc<WebSocketState>>,
 ) -> impl IntoResponse {
     // TODO: implement decoding JWT here
     let user = "1".to_string();
+
+    {
+        let player_connections = state.player_connections.read().await;
+        if player_connections.contains_key(&user) {
+            return Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .body(Body::from("This player is already connected"))
+                .unwrap();
+        }
+    }
+
     websocket.on_upgrade(move |socket| handle_websocket(user, socket, state))
 }
 
 pub(crate) async fn handle_websocket(
     user: String,
     websocket: WebSocket,
-    state: Arc<WebSocketGameState>,
+    state: Arc<WebSocketState>,
 ) {
     let (mut sink, mut stream) = websocket.split();
-    let (mut sender, mut receiver) = mpsc::channel(128);
+    let (sender, mut receiver) = mpsc::channel(128);
+
+    {
+        let mut player_connections = state.player_connections.write().await;
+        player_connections.insert(user.clone(), sender.clone());
+    }
 
     let sender2 = sender.clone();
     let mut broadcast_subscriber = state.broadcast_sender.subscribe();
@@ -44,9 +62,12 @@ pub(crate) async fn handle_websocket(
     });
 
     // task for handling messages received from websocket
+    let state2 = state.clone();
+    let user2 = user.clone();
+    let mut sender3 = sender.clone();
     let mut receiver_task = tokio::spawn(async move {
         while let Some(Ok(message)) = stream.next().await {
-            if handle_message(message, user.as_str(), state.clone(), &mut sender)
+            if handle_message(message, user2.as_str(), state2.clone(), &mut sender3)
                 .await
                 .is_break()
             {
@@ -67,12 +88,15 @@ pub(crate) async fn handle_websocket(
         _ = &mut receiver_task => broadcast_receiver_task.abort(),
         _ = &mut broadcast_receiver_task => receiver_task.abort()
     }
+
+    let mut player_connections = state.player_connections.write().await;
+    player_connections.remove(&user);
 }
 
 pub(crate) async fn handle_message(
     message: Message,
     player: &str,
-    state: Arc<WebSocketGameState>,
+    state: Arc<WebSocketState>,
     sender: &mut mpsc::Sender<Message>,
 ) -> ControlFlow<(), ()> {
     let mut broadcast_sender = state.broadcast_sender.clone();
@@ -91,7 +115,7 @@ pub(crate) async fn handle_text_message(
     player: &str,
     sender: &mut mpsc::Sender<Message>,
     broadcast_sender: &mut broadcast::Sender<Message>,
-    state: Arc<WebSocketGameState>,
+    state: Arc<WebSocketState>,
 ) -> ControlFlow<(), ()> {
     // TODO: reduce duplication of uuid parsing with macro?
     match serde_json::from_str::<WebSocketPayload>(&text) {

@@ -8,7 +8,7 @@ use crate::step::GameStep;
 use serde::Serialize;
 use std::error::Error;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Game {
     pub settings: GameSettings,
     pub players: Vec<String>,
@@ -74,7 +74,7 @@ pub struct GameSettings {
     pub max_score: usize,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum GameState {
     CardExchange(GameStep<CardExchangeState>),
     RoundInProgress(GameStep<RoundInProgressState>),
