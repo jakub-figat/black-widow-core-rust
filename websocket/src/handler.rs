@@ -5,12 +5,12 @@ use crate::game_action::{
 use crate::helper::parse_uuid_from_payload;
 use crate::network::{send_error_or_break, send_text_or_break};
 use crate::payload::{WebSocketAction::*, WebSocketPayload};
+use crate::response::ErrorResponse;
 use crate::WebSocketState;
-use axum::body::Body;
 use axum::extract::ws::{Message, WebSocket};
 use axum::extract::{State, WebSocketUpgrade};
-use axum::http::{Response, StatusCode};
 use axum::response::IntoResponse;
+use futures::stream::{SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
 use std::ops::ControlFlow;
 use std::sync::Arc;
@@ -22,17 +22,6 @@ pub(crate) async fn handle(
 ) -> impl IntoResponse {
     // TODO: implement decoding JWT here
     let user = "1".to_string();
-
-    {
-        let player_connections = state.player_connections.read().await;
-        if player_connections.contains_key(&user) {
-            return Response::builder()
-                .status(StatusCode::BAD_REQUEST)
-                .body(Body::from("This player is already connected"))
-                .unwrap();
-        }
-    }
-
     websocket.on_upgrade(move |socket| handle_websocket(user, socket, state))
 }
 
@@ -41,48 +30,21 @@ pub(crate) async fn handle_websocket(
     websocket: WebSocket,
     state: Arc<WebSocketState>,
 ) {
-    let (mut sink, mut stream) = websocket.split();
-    let (sender, mut receiver) = mpsc::channel(128);
+    let (sink, stream) = websocket.split();
+    let (mut sender, receiver) = mpsc::channel(128);
+    tokio::spawn(wrap_sink(sink, receiver));
 
+    if let Err(text) = add_player_to_connections(user.as_str(), sender.clone(), state.clone()).await
     {
-        let mut player_connections = state.player_connections.write().await;
-        player_connections.insert(user.clone(), sender.clone());
+        send_error_or_break(&text, &mut sender).await;
+        return;
     }
 
-    let sender2 = sender.clone();
-    let mut broadcast_subscriber = state.broadcast_sender.subscribe();
-
-    // wrapped websocket sender
-    tokio::spawn(async move {
-        while let Some(message) = receiver.recv().await {
-            if sink.send(message).await.is_err() {
-                break;
-            }
-        }
-    });
-
-    // task for handling messages received from websocket
-    let state2 = state.clone();
-    let user2 = user.clone();
-    let mut sender3 = sender.clone();
-    let mut receiver_task = tokio::spawn(async move {
-        while let Some(Ok(message)) = stream.next().await {
-            if handle_message(message, user2.as_str(), state2.clone(), &mut sender3)
-                .await
-                .is_break()
-            {
-                break;
-            }
-        }
-    });
-
-    let mut broadcast_receiver_task = tokio::spawn(async move {
-        while let Ok(message) = broadcast_subscriber.recv().await {
-            if sender2.send(message).await.is_err() {
-                break;
-            }
-        }
-    });
+    let mut receiver_task = tokio::spawn(read(stream, sender.clone(), user.clone(), state.clone()));
+    let mut broadcast_receiver_task = tokio::spawn(read_broadcast(
+        sender.clone(),
+        state.broadcast_sender.subscribe(),
+    ));
 
     tokio::select! {
         _ = &mut receiver_task => broadcast_receiver_task.abort(),
@@ -91,6 +53,54 @@ pub(crate) async fn handle_websocket(
 
     let mut player_connections = state.player_connections.write().await;
     player_connections.remove(&user);
+}
+
+async fn add_player_to_connections(
+    player: &str,
+    sender: mpsc::Sender<Message>,
+    state: Arc<WebSocketState>,
+) -> Result<(), String> {
+    let mut player_connections = state.player_connections.write().await;
+    if player_connections.contains_key(player) {
+        Err("This player is already connected")?
+    }
+    player_connections.insert(player.to_string(), sender);
+    Ok(())
+}
+
+async fn read(
+    mut stream: SplitStream<WebSocket>,
+    mut sender: mpsc::Sender<Message>,
+    user: String,
+    state: Arc<WebSocketState>,
+) {
+    while let Some(Ok(message)) = stream.next().await {
+        if handle_message(message, &user, state.clone(), &mut sender)
+            .await
+            .is_break()
+        {
+            break;
+        }
+    }
+}
+
+async fn read_broadcast(
+    mut sender: mpsc::Sender<Message>,
+    mut broadcast_receiver: broadcast::Receiver<Message>,
+) {
+    while let Ok(message) = broadcast_receiver.recv().await {
+        if sender.send(message).await.is_err() {
+            break;
+        }
+    }
+}
+
+async fn wrap_sink(mut sink: SplitSink<WebSocket, Message>, mut receiver: mpsc::Receiver<Message>) {
+    while let Some(message) = receiver.recv().await {
+        if sink.send(message).await.is_err() {
+            break;
+        }
+    }
 }
 
 pub(crate) async fn handle_message(
