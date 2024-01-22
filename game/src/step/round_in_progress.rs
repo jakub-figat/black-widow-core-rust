@@ -5,7 +5,7 @@ use crate::payload::PlaceCardPayload;
 use crate::r#trait::PayloadHandler;
 use crate::step::round_finished::RoundFinishedState;
 use crate::step::GameStep;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 impl GameStep<RoundInProgressState> {
     fn validate_current_player(&self, player: &str) -> GameResult<()> {

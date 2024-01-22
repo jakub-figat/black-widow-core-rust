@@ -1,25 +1,10 @@
 use crate::card::Card;
-use crate::error::{GameError, GameResult};
 use serde::Deserialize;
 use std::collections::HashSet;
 
 #[derive(Debug, PartialEq, Deserialize)]
 pub struct CardExchangePayload {
     pub cards_to_exchange: HashSet<Card>,
-}
-
-impl CardExchangePayload {
-    pub fn from_cards(cards: &HashSet<Card>) -> GameResult<CardExchangePayload> {
-        if cards.len() != 3 {
-            Err(GameError(
-                "CardExchangePayload cards require passing exactly 3 cards".to_string(),
-            ))?
-        }
-
-        Ok(CardExchangePayload {
-            cards_to_exchange: cards.clone(),
-        })
-    }
 }
 
 #[derive(Deserialize)]

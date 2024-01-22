@@ -9,7 +9,6 @@ use crate::r#trait::PayloadHandler;
 use crate::step::round_in_progress::RoundInProgressState;
 use crate::step::GameStep;
 use std::collections::{HashMap, HashSet};
-use std::error::Error;
 
 impl GameStep<CardExchangeState> {
     pub fn initialize_from_players(players: &[String]) -> GameStep<CardExchangeState> {
@@ -87,6 +86,12 @@ impl PayloadHandler<'_, CardExchangePayload> for GameStep<CardExchangeState> {
                 "Player {} has already declared cards for exchange",
                 player
             )))?
+        }
+
+        if payload.cards_to_exchange.len() != 3 {
+            Err(GameError(
+                "CardExchangePayload cards require passing exactly 3 cards".to_string(),
+            ))?
         }
 
         for card in &payload.cards_to_exchange {

@@ -3,7 +3,6 @@ use crate::card::CardSuit::{Club, Diamond, Heart, Spade};
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 use std::collections::{HashMap, HashSet};
-use std::hash::Hash;
 
 pub fn pick_player_with_starting_card(
     player_decks: &HashMap<String, HashSet<Card>>,

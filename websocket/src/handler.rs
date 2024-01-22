@@ -85,7 +85,7 @@ async fn read(
 }
 
 async fn read_broadcast(
-    mut sender: mpsc::Sender<Message>,
+    sender: mpsc::Sender<Message>,
     mut broadcast_receiver: broadcast::Receiver<Message>,
 ) {
     while let Ok(message) = broadcast_receiver.recv().await {
