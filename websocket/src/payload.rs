@@ -41,3 +41,10 @@ pub(crate) struct CreateLobbyPayload {
     #[serde(rename = "maxScore")]
     pub(crate) max_score: usize,
 }
+
+#[derive(Deserialize)]
+pub(crate) struct GameMovePayload {
+    pub(crate) id: String,
+    #[serde(rename = "gamePayload")]
+    pub(crate) game_payload: String,
+}

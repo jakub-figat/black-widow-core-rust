@@ -14,13 +14,14 @@ use futures::{SinkExt, StreamExt};
 use std::ops::ControlFlow;
 use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc};
+use uuid::Uuid;
 
 pub(crate) async fn handle(
     websocket: WebSocketUpgrade,
     State(state): State<Arc<WebSocketState>>,
 ) -> impl IntoResponse {
     // TODO: implement decoding JWT here
-    let user = "1".to_string();
+    let user = Uuid::new_v4().to_string();
     websocket.on_upgrade(move |socket| handle_websocket(socket, user, state))
 }
 
@@ -150,9 +151,9 @@ pub(crate) async fn handle_text_message(
                 Ok(id) => get_game_details(&id, player, sender, state).await,
                 Err(error) => send_error_or_break(&error.to_string(), sender).await,
             },
-            GameMove => game_move(&payload.data, player, sender, broadcast_sender, state).await,
+            GameMove => game_move(&payload.data, player.to_string(), sender, state).await,
             QuitGame => match parse_uuid_from_payload(&payload.data) {
-                Ok(id) => quit_game(&id, player, sender, broadcast_sender, state).await,
+                Ok(id) => quit_game(&id, player.to_string(), sender, broadcast_sender, state).await,
                 Err(error) => send_error_or_break(&error.to_string(), sender).await,
             },
         },
