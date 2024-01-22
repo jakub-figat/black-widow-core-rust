@@ -5,7 +5,7 @@ use crate::network::{
 };
 use crate::payload::{CreateLobbyPayload, GameMovePayload};
 use crate::response::{
-    game_to_json, GameListResponse, IdResponse, LobbyDetailsResponse, LobbyListResponse, ToJson,
+    game_to_json, GameListResponse, IdResponse, LobbyDetailsResponse, LobbyListResponse,
     WebSocketResponse::*,
 };
 use crate::WebSocketState;

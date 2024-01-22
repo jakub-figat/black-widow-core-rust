@@ -1,6 +1,5 @@
-use crate::response::WebSocketResponse;
-use crate::response::WebSocketResponse::GameDetails;
-use crate::response::{game_to_json, ToJson};
+use crate::response::game_to_json;
+use crate::response::WebSocketResponse::{Error, GameDetails};
 use crate::WebSocketState;
 use axum::extract::ws::Message;
 use game::Game;
@@ -67,9 +66,5 @@ pub(crate) async fn send_error_or_break(
     text: &str,
     sender: &mut mpsc::Sender<Message>,
 ) -> ControlFlow {
-    send_text_or_break(
-        &WebSocketResponse::Error(text.to_string()).to_json(),
-        sender,
-    )
-    .await
+    send_text_or_break(&Error(text.to_string()).to_json(), sender).await
 }

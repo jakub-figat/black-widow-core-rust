@@ -4,6 +4,7 @@ use game::step::GameStep;
 use game::{Card, Game, GameSettings};
 use game::{CardExchange, RoundFinished, RoundInProgress};
 use serde::Serialize;
+use serde_json::json;
 use std::collections::{HashMap, HashSet};
 
 #[derive(Serialize)]
@@ -161,10 +162,11 @@ pub(crate) struct RoundFinishedState {
     players_ready: HashMap<String, bool>,
 }
 
-pub(crate) trait ToJson: Serialize {
-    fn to_json(&self) -> String {
-        serde_json::to_string(self).unwrap()
+impl WebSocketResponse {
+    pub(crate) fn to_json(&self) -> String {
+        match self {
+            WebSocketResponse::Error(text) => json!({"error": text.clone()}).to_string(),
+            _ => serde_json::to_string(self).unwrap(),
+        }
     }
 }
-
-impl ToJson for WebSocketResponse {}

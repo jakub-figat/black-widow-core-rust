@@ -1,7 +1,7 @@
 use serde::Deserialize;
 
 #[derive(Deserialize)]
-#[serde(tag = "type")]
+#[serde(tag = "action")]
 pub(crate) enum WebSocketPayload {
     #[serde(rename = "listLobbies")]
     ListLobbies,
