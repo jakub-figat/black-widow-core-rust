@@ -5,8 +5,8 @@ use crate::network::{
 };
 use crate::payload::{CreateLobbyPayload, GameMovePayload};
 use crate::response::{
-    game_to_json, ErrorResponse, GameDeletedResponse, GameListResponse, LobbyDeletedResponse,
-    LobbyDetailsResponse, LobbyListResponse, ToJson,
+    game_to_json, GameListResponse, IdResponse, LobbyDetailsResponse, LobbyListResponse, ToJson,
+    WebSocketResponse::*,
 };
 use crate::WebSocketState;
 use axum::extract::ws::Message;
@@ -22,7 +22,9 @@ type BroadcastSender = broadcast::Sender<Message>;
 
 pub(crate) async fn list_lobbies(sender: &mut Sender, state: Arc<WebSocketState>) -> ControlFlow {
     let lobbies = state.lobbies.lock().await;
-    let response = LobbyListResponse::new(&lobbies);
+    let response = LobbyList(LobbyListResponse {
+        lobbies: lobbies.clone(),
+    });
     send_text_or_break(&response.to_json(), sender).await;
     ControlFlow::Continue(())
 }
@@ -35,7 +37,9 @@ pub(crate) async fn get_lobby_details(
     let lobbies = state.lobbies.lock().await;
     match lobbies.get(id) {
         Some(lobby) => {
-            let response = LobbyDetailsResponse::new(lobby);
+            let response = LobbyDetails(LobbyDetailsResponse {
+                lobby: lobby.clone(),
+            });
             send_text_or_break(&response.to_json(), sender).await
         }
         None => send_error_or_break(&format!("Lobby with id {} not found", &id), sender).await,
@@ -43,23 +47,22 @@ pub(crate) async fn get_lobby_details(
 }
 
 pub(crate) async fn create_lobby(
-    payload: &str,
+    payload: &CreateLobbyPayload,
     player: &str,
     sender: &mut Sender,
     broadcast_sender: &mut BroadcastSender,
     state: Arc<WebSocketState>,
 ) -> ControlFlow {
-    match serde_json::from_str::<CreateLobbyPayload>(payload) {
-        Ok(payload) => match Lobby::new_by_player(payload.max_players, payload.max_score, player) {
-            Ok(lobby) => {
-                let mut lobbies = state.lobbies.lock().await;
-                lobbies.insert(Uuid::new_v4().to_string(), lobby.clone());
+    match Lobby::new_by_player(payload.max_players, payload.max_score, player) {
+        Ok(lobby) => {
+            let mut lobbies = state.lobbies.lock().await;
+            lobbies.insert(Uuid::new_v4().to_string(), lobby.clone());
 
-                let response = LobbyDetailsResponse::new(&lobby);
-                broadcast_text_or_break(&response.to_json(), broadcast_sender)
-            }
-            Err(error) => send_error_or_break(&error.to_string(), sender).await,
-        },
+            let response = LobbyDetails(LobbyDetailsResponse {
+                lobby: lobby.clone(),
+            });
+            broadcast_text_or_break(&response.to_json(), broadcast_sender)
+        }
         Err(error) => send_error_or_break(&error.to_string(), sender).await,
     }
 }
@@ -79,13 +82,15 @@ pub(crate) async fn join_lobby(
                 lobbies.remove(id);
 
                 broadcast_text_or_break(
-                    &LobbyDeletedResponse::new(id).to_json(),
+                    &LobbyDeleted(IdResponse { id: id.to_string() }).to_json(),
                     broadcast_sender,
                 )?;
                 broadcast_game_to_players_or_break(&game_id, &game, state.clone()).await
             }
             None => {
-                let response = LobbyDetailsResponse::new(&lobby);
+                let response = LobbyDetails(LobbyDetailsResponse {
+                    lobby: lobby.clone(),
+                });
                 broadcast_text_or_break(&response.to_json(), broadcast_sender)
             }
         },
@@ -142,9 +147,12 @@ pub(crate) async fn quit_lobby(
             let response = match remove_player_from_lobby(player, &mut lobby).await {
                 Some(_) => {
                     lobbies.remove(id);
-                    LobbyDeletedResponse::new(id).to_json()
+                    LobbyDeleted(IdResponse { id: id.to_string() }).to_json()
                 }
-                None => LobbyDetailsResponse::new(&lobby).to_json(),
+                None => LobbyDetails(LobbyDetailsResponse {
+                    lobby: lobby.clone(),
+                })
+                .to_json(),
             };
             broadcast_text_or_break(&response, broadcast_sender)
         }
@@ -163,7 +171,7 @@ async fn remove_player_from_lobby(player: String, lobby: &mut Lobby) -> Option<(
 
 pub(crate) async fn list_games(sender: &mut Sender, state: Arc<WebSocketState>) -> ControlFlow {
     let game_hashmap = state.games.lock().await;
-    let response = GameListResponse::json_from_game_hashmap(&game_hashmap);
+    let response = GameList(GameListResponse::from_game_hashmap(&game_hashmap)).to_json();
     send_text_or_break(&response, sender).await
 }
 
@@ -174,51 +182,54 @@ pub(crate) async fn get_game_details(
     state: Arc<WebSocketState>,
 ) -> ControlFlow {
     let game_hashmap = state.games.lock().await;
-    let response = match game_hashmap.get(id) {
+    match game_hashmap.get(id) {
         Some(game) => match game.players.iter().find(|&s| s.as_str() == player) {
-            Some(_) => game_to_json(id, game, player),
-            None => {
-                ErrorResponse::json_from_detail(&format!("You don't belong to game with id {}", id))
-            }
-        },
-        None => ErrorResponse::json_from_detail(&format!("Game with id {} does not exist", id)),
-    };
-    send_text_or_break(&response, sender).await
-}
-
-pub(crate) async fn game_move(
-    payload: &str,
-    player: String,
-    sender: &mut Sender,
-    state: Arc<WebSocketState>,
-) -> ControlFlow {
-    match serde_json::from_str::<GameMovePayload>(payload) {
-        Ok(payload) => match state.games.lock().await.get_mut(&payload.id) {
-            Some(game) => {
-                if !game.players.contains(&player) {
-                    return send_error_or_break(
-                        &format!("You don't participate in game with id {}", payload.id),
-                        sender,
-                    )
-                    .await;
-                }
-
-                match game.dispatch_payload(&payload.game_payload, &player) {
-                    Ok(_) => {
-                        broadcast_game_to_players_or_break(&payload.id, &game, state.clone()).await
-                    }
-                    Err(game_error) => send_error_or_break(&game_error.to_string(), sender).await,
-                }
-            }
-            None => {
-                send_error_or_break(
-                    &format!("Game with id {} does not exist", payload.id),
+            Some(_) => {
+                send_text_or_break(
+                    &GameDetails(game_to_json(id, game, player)).to_json(),
                     sender,
                 )
                 .await
             }
+            None => {
+                send_error_or_break(&format!("You don't belong to game with id {}", id), sender)
+                    .await
+            }
         },
-        Err(error) => send_error_or_break(&error.to_string(), sender).await,
+        None => send_error_or_break(&format!("Game with id {} does not exist", id), sender).await,
+    }
+}
+
+pub(crate) async fn game_move(
+    payload: &GameMovePayload,
+    player: String,
+    sender: &mut Sender,
+    state: Arc<WebSocketState>,
+) -> ControlFlow {
+    match state.games.lock().await.get_mut(&payload.id) {
+        Some(game) => {
+            if !game.players.contains(&player) {
+                return send_error_or_break(
+                    &format!("You don't participate in game with id {}", payload.id),
+                    sender,
+                )
+                .await;
+            }
+
+            match game.dispatch_payload(&payload.game_payload, &player) {
+                Ok(_) => {
+                    broadcast_game_to_players_or_break(&payload.id, &game, state.clone()).await
+                }
+                Err(game_error) => send_error_or_break(&game_error.to_string(), sender).await,
+            }
+        }
+        None => {
+            send_error_or_break(
+                &format!("Game with id {} does not exist", payload.id),
+                sender,
+            )
+            .await
+        }
     }
 }
 
@@ -243,7 +254,7 @@ pub(crate) async fn quit_game(
             match remove_player_from_game(player, &mut game).await {
                 Some(_) => {
                     games.remove(id);
-                    let response = GameDeletedResponse::new(id).to_json();
+                    let response = GameDeleted(IdResponse { id: id.to_string() }).to_json();
                     broadcast_text_or_break(&response, broadcast_sender)
                 }
                 None => broadcast_game_to_players_or_break(id, &game, state.clone()).await,

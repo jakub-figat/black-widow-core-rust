@@ -1,32 +1,26 @@
 use serde::Deserialize;
 
 #[derive(Deserialize)]
-pub(crate) enum WebSocketAction {
+#[serde(tag = "type")]
+pub(crate) enum WebSocketPayload {
     #[serde(rename = "listLobbies")]
     ListLobbies,
     #[serde(rename = "getLobbyDetails")]
-    GetLobbyDetails,
+    GetLobbyDetails(IdPayload),
     #[serde(rename = "createLobby")]
-    CreateLobby,
+    CreateLobby(CreateLobbyPayload),
     #[serde(rename = "joinLobby")]
-    JoinLobby,
+    JoinLobby(IdPayload),
     #[serde(rename = "quitLobby")]
-    QuitLobby,
+    QuitLobby(IdPayload),
     #[serde(rename = "listGames")]
     ListGames,
     #[serde(rename = "getGameDetails")]
-    GetGameDetails,
+    GetGameDetails(IdPayload),
     #[serde(rename = "gameMove")]
-    GameMove,
+    GameMove(GameMovePayload),
     #[serde(rename = "quitGame")]
-    QuitGame,
-}
-
-#[derive(Deserialize)]
-pub(crate) struct WebSocketPayload {
-    pub(crate) action: WebSocketAction,
-    #[serde(default)]
-    pub(crate) data: String,
+    QuitGame(IdPayload),
 }
 
 #[derive(Deserialize)]

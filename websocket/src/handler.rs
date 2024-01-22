@@ -2,9 +2,9 @@ use crate::game_action::{
     create_lobby, game_move, get_game_details, get_lobby_details, join_lobby, list_games,
     list_lobbies, quit_game, quit_lobby,
 };
-use crate::helper::parse_uuid_from_payload;
+use crate::helper::parse_uuid;
 use crate::network::{send_error_or_break, send_text_or_break};
-use crate::payload::{WebSocketAction::*, WebSocketPayload};
+use crate::payload::{WebSocketPayload, WebSocketPayload::*};
 use crate::WebSocketState;
 use axum::extract::ws::{Message, WebSocket};
 use axum::extract::{State, WebSocketUpgrade};
@@ -129,34 +129,41 @@ pub(crate) async fn handle_text_message(
 ) -> ControlFlow<(), ()> {
     // TODO: reduce duplication of uuid parsing with macro?
     match serde_json::from_str::<WebSocketPayload>(&text) {
-        Ok(payload) => match payload.action {
+        Ok(payload) => match payload {
             ListLobbies => list_lobbies(sender, state).await,
-            GetLobbyDetails => match parse_uuid_from_payload(&payload.data) {
+            GetLobbyDetails(id_payload) => match parse_uuid(&id_payload.id) {
                 Ok(id) => get_lobby_details(&id, sender, state).await,
                 Err(error) => send_error_or_break(&error.to_string(), sender).await,
             },
-            CreateLobby => {
-                create_lobby(&payload.data, player, sender, broadcast_sender, state).await
+            CreateLobby(create_lobby_payload) => {
+                create_lobby(
+                    &create_lobby_payload,
+                    player,
+                    sender,
+                    broadcast_sender,
+                    state,
+                )
+                .await
             }
-            JoinLobby => match parse_uuid_from_payload(&payload.data) {
+            JoinLobby(join_lobby_payload) => match parse_uuid(&join_lobby_payload.id) {
                 Ok(id) => join_lobby(&id, player, sender, broadcast_sender, state).await,
                 Err(error) => send_error_or_break(&error.to_string(), sender).await,
             },
-            QuitLobby => match parse_uuid_from_payload(&payload.data) {
+            QuitLobby(id_payload) => match parse_uuid(&id_payload.id) {
                 Ok(id) => quit_lobby(&id, player, sender, broadcast_sender, state).await,
                 Err(error) => send_error_or_break(&error.to_string(), sender).await,
             },
             ListGames => list_games(sender, state).await,
-            GetGameDetails => match parse_uuid_from_payload(&payload.data) {
+            GetGameDetails(id_payload) => match parse_uuid(&id_payload.id) {
                 Ok(id) => get_game_details(&id, player, sender, state).await,
                 Err(error) => send_error_or_break(&error.to_string(), sender).await,
             },
-            GameMove => game_move(&payload.data, player.to_string(), sender, state).await,
-            QuitGame => match parse_uuid_from_payload(&payload.data) {
+            GameMove(payload) => game_move(&payload, player.to_string(), sender, state).await,
+            QuitGame(id_payload) => match parse_uuid(&id_payload.id) {
                 Ok(id) => quit_game(&id, player.to_string(), sender, broadcast_sender, state).await,
                 Err(error) => send_error_or_break(&error.to_string(), sender).await,
             },
         },
-        Err(_) => send_error_or_break("Invalid JSON payload", sender).await,
+        Err(error) => send_error_or_break(&error.to_string(), sender).await,
     }
 }

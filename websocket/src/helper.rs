@@ -27,12 +27,9 @@ pub(crate) fn get_obfuscated_exchange_cards(
         .collect()
 }
 
-pub(crate) fn parse_uuid_from_payload(string: &str) -> Result<String, ValidationError> {
-    match serde_json::from_str::<IdPayload>(&string) {
-        Ok(payload) => match Uuid::from_str(&payload.id) {
-            Ok(parsed_uuid) => Ok(parsed_uuid.to_string()),
-            Err(error) => Err(ValidationError(error.to_string())),
-        },
+pub(crate) fn parse_uuid(id: &str) -> Result<String, ValidationError> {
+    match Uuid::from_str(&id) {
+        Ok(parsed_uuid) => Ok(parsed_uuid.to_string()),
         Err(error) => Err(ValidationError(error.to_string())),
     }
 }
