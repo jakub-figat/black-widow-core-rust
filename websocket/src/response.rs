@@ -20,6 +20,7 @@ pub(crate) enum WebSocketResponse {
     GameList(GameListResponse),
     #[serde(rename = "gameDetails")]
     GameDetails(String),
+    // TODO: refactor serializing game details, it's broken
     #[serde(rename = "gameDeleted")]
     GameDeleted(IdResponse),
     #[serde(rename = "error")]
