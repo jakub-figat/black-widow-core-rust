@@ -1,12 +1,16 @@
-use crate::error::GameResult;
 use crate::helper::get_starting_player_decks;
 use crate::payload::ClaimReadinessPayload;
-use crate::r#trait::PayloadHandler;
 use crate::step::card_exchange::CardExchangeState;
 use crate::step::GameStep;
 use std::collections::HashMap;
 
 impl GameStep<RoundFinishedState> {
+    pub fn handle_payload(&mut self, payload: &ClaimReadinessPayload, player: &str) {
+        self.state
+            .players_ready
+            .insert(player.to_string(), payload.ready);
+    }
+
     pub fn should_switch(&self) -> bool {
         self.state.players_ready.len() == self.players.len()
     }
@@ -29,18 +33,6 @@ impl GameStep<RoundFinishedState> {
             player_decks: get_starting_player_decks(&self.players),
             state: CardExchangeState::new(),
         }
-    }
-}
-
-impl PayloadHandler<'_, ClaimReadinessPayload> for GameStep<RoundFinishedState> {
-    fn validate_payload(&self, _payload: &ClaimReadinessPayload, _player: &str) -> GameResult<()> {
-        Ok(())
-    }
-
-    fn dispatch_payload(&mut self, payload: &ClaimReadinessPayload, player: &str) {
-        self.state
-            .players_ready
-            .insert(player.to_string(), payload.ready);
     }
 }
 
@@ -72,7 +64,7 @@ mod tests {
     fn claim_readiness() {
         let mut step = get_step();
         let payload = ClaimReadinessPayload { ready: true };
-        let result = step.dispatch_payload(&payload, "1");
+        step.handle_payload(&payload, "1");
 
         assert_eq!(step.state.players_ready["1"], true);
     }
@@ -83,7 +75,7 @@ mod tests {
         step.state.players_ready.insert("1".to_string(), true);
 
         let payload = ClaimReadinessPayload { ready: false };
-        let result = step.dispatch_payload(&payload, "1");
+        step.handle_payload(&payload, "1");
 
         assert_eq!(step.state.players_ready["1"], false);
     }

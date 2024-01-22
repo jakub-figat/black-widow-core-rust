@@ -5,7 +5,6 @@ use crate::helper::{
     get_player_to_player_map, get_starting_player_decks, pick_player_with_starting_card,
 };
 use crate::payload::CardExchangePayload;
-use crate::r#trait::PayloadHandler;
 use crate::step::round_in_progress::RoundInProgressState;
 use crate::step::GameStep;
 use std::collections::{HashMap, HashSet};
@@ -35,6 +34,48 @@ impl GameStep<CardExchangeState> {
             ),
             state: CardExchangeState::new(),
         }
+    }
+
+    pub(crate) fn validate_payload(
+        &self,
+        payload: &CardExchangePayload,
+        player: &str,
+    ) -> GameResult<()> {
+        if self.state.cards_to_exchange.get(player).is_some() {
+            Err(GameError(format!(
+                "Player {} has already declared cards for exchange",
+                player
+            )))?
+        }
+
+        if payload.cards_to_exchange.len() != 3 {
+            Err(GameError(
+                "CardExchangePayload cards require passing exactly 3 cards".to_string(),
+            ))?
+        }
+
+        for card in &payload.cards_to_exchange {
+            self.validate_player_has_card(card, player)?
+        }
+
+        Ok(())
+    }
+
+    pub(crate) fn dispatch_payload(&mut self, payload: &CardExchangePayload, player: &str) {
+        self.state
+            .cards_to_exchange
+            .insert(player.to_string(), payload.cards_to_exchange.clone());
+    }
+
+    pub fn handle_payload(
+        &mut self,
+        payload: &CardExchangePayload,
+        player: &str,
+    ) -> Result<(), GameError> {
+        self.validate_payload(&payload, player)?;
+        self.dispatch_payload(&payload, player);
+
+        Ok(())
     }
 
     pub fn should_switch(&self) -> bool {
@@ -76,35 +117,6 @@ impl GameStep<CardExchangeState> {
                     .insert(card.clone());
             }
         }
-    }
-}
-
-impl PayloadHandler<'_, CardExchangePayload> for GameStep<CardExchangeState> {
-    fn validate_payload(&self, payload: &CardExchangePayload, player: &str) -> GameResult<()> {
-        if self.state.cards_to_exchange.get(player).is_some() {
-            Err(GameError(format!(
-                "Player {} has already declared cards for exchange",
-                player
-            )))?
-        }
-
-        if payload.cards_to_exchange.len() != 3 {
-            Err(GameError(
-                "CardExchangePayload cards require passing exactly 3 cards".to_string(),
-            ))?
-        }
-
-        for card in &payload.cards_to_exchange {
-            self.validate_player_has_card(card, player)?
-        }
-
-        Ok(())
-    }
-
-    fn dispatch_payload(&mut self, payload: &CardExchangePayload, player: &str) {
-        self.state
-            .cards_to_exchange
-            .insert(player.to_string(), payload.cards_to_exchange.clone());
     }
 }
 
@@ -159,6 +171,28 @@ mod tests {
     }
 
     #[test]
+    fn validate_payload_returns_error_when_there_arent_3_cards() {
+        let players = get_players();
+        let step = GameStep::empty_from_players(&players);
+        let cards = HashSet::from([
+            Card::new(Spade, 2),
+            Card::new(Spade, 3),
+            Card::new(Spade, 4),
+            Card::new(Spade, 5),
+        ]);
+
+        let payload = CardExchangePayload {
+            cards_to_exchange: cards.clone(),
+        };
+        assert_eq!(
+            step.validate_payload(&payload, &players[0]),
+            Err(GameError(
+                "CardExchangePayload cards require passing exactly 3 cards".to_string()
+            ))
+        )
+    }
+
+    #[test]
     fn validate_payload_returns_error_when_player_already_placed_cards_for_exchange() {
         let players = get_players();
         let mut step = GameStep::empty_from_players(&players);
@@ -171,7 +205,9 @@ mod tests {
         step.state
             .cards_to_exchange
             .insert("1".to_string(), cards.clone());
-        let payload = CardExchangePayload::from_cards(&cards).unwrap();
+        let payload = CardExchangePayload {
+            cards_to_exchange: cards.clone(),
+        };
 
         assert_eq!(
             step.validate_payload(&payload, &players[0]),
@@ -189,7 +225,9 @@ mod tests {
             Card::new(Spade, 3),
             Card::new(Spade, 4),
         ]);
-        let payload = CardExchangePayload::from_cards(&cards).unwrap();
+        let payload = CardExchangePayload {
+            cards_to_exchange: cards.clone(),
+        };
         let mut step = GameStep::empty_from_players(&players);
         step.dispatch_payload(&payload, &players[0]);
 

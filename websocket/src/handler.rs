@@ -1,6 +1,6 @@
 use crate::game_action::{
-    create_lobby, game_move, get_game_details, get_lobby_details, join_lobby, list_games,
-    list_lobbies, quit_game, quit_lobby,
+    card_exchange_move, claim_readiness_move, create_lobby, get_game_details, get_lobby_details,
+    join_lobby, list_games, list_lobbies, place_card_move, quit_game, quit_lobby,
 };
 use crate::helper::parse_uuid;
 use crate::network::{send_error_or_break, send_text_or_break};
@@ -50,7 +50,7 @@ pub(crate) async fn handle_websocket(
         _ = &mut receiver_task => broadcast_receiver_task.abort(),
         _ = &mut broadcast_receiver_task => receiver_task.abort()
     }
-    // TODO: test reconnecting
+
     let mut player_connections = state.player_connections.write().await;
     player_connections.remove(&user);
 }
@@ -127,7 +127,6 @@ pub(crate) async fn handle_text_message(
     broadcast_sender: &mut broadcast::Sender<Message>,
     state: Arc<WebSocketState>,
 ) -> ControlFlow<(), ()> {
-    // TODO: reduce duplication of uuid parsing with macro?
     match serde_json::from_str::<WebSocketPayload>(&text) {
         Ok(payload) => match payload {
             ListLobbies => list_lobbies(sender, state).await,
@@ -158,7 +157,18 @@ pub(crate) async fn handle_text_message(
                 Ok(id) => get_game_details(&id, player, sender, state).await,
                 Err(error) => send_error_or_break(&error.to_string(), sender).await,
             },
-            GameMove(payload) => game_move(&payload, player.to_string(), sender, state).await,
+            CardExchangeMove(payload) => match parse_uuid(&payload.id) {
+                Ok(_) => card_exchange_move(&payload, player.to_string(), sender, state).await,
+                Err(error) => send_error_or_break(&error.to_string(), sender).await,
+            },
+            PlaceCardMove(payload) => match parse_uuid(&payload.id) {
+                Ok(_) => place_card_move(&payload, player.to_string(), sender, state).await,
+                Err(error) => send_error_or_break(&error.to_string(), sender).await,
+            },
+            ClaimReadinessMove(payload) => match parse_uuid(&payload.id) {
+                Ok(_) => claim_readiness_move(&payload, player.to_string(), sender, state).await,
+                Err(error) => send_error_or_break(&error.to_string(), sender).await,
+            },
             QuitGame(id_payload) => match parse_uuid(&id_payload.id) {
                 Ok(id) => quit_game(&id, player.to_string(), sender, broadcast_sender, state).await,
                 Err(error) => send_error_or_break(&error.to_string(), sender).await,

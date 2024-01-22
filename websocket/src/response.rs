@@ -1,8 +1,10 @@
 use crate::helper::{get_obfuscated_exchange_cards, get_obfuscated_player_cards};
 use crate::lobby::Lobby;
+use crate::response::WebSocketResponse::{
+    GameDetailsCardExchange, GameDetailsRoundFinished, GameDetailsRoundInProgress,
+};
 use game::step::GameStep;
-use game::{Card, Game, GameSettings};
-use game::{CardExchange, RoundFinished, RoundInProgress};
+use game::{self, Card, CardExchange, Game, GameSettings, RoundFinished, RoundInProgress};
 use serde::Serialize;
 use serde_json::json;
 use std::collections::{HashMap, HashSet};
@@ -18,9 +20,12 @@ pub(crate) enum WebSocketResponse {
     LobbyDeleted(IdResponse),
     #[serde(rename = "gameList")]
     GameList(GameListResponse),
-    #[serde(rename = "gameDetails")]
-    GameDetails(String),
-    // TODO: refactor serializing game details, it's broken
+    #[serde(rename = "gameDetailsCardExchange")]
+    GameDetailsCardExchange(GameDetailsResponse<CardExchangeState>),
+    #[serde(rename = "gameDetailsRoundInProgress")]
+    GameDetailsRoundInProgress(GameDetailsResponse<RoundInProgressState>),
+    #[serde(rename = "gameDetailsCardExchange")]
+    GameDetailsRoundFinished(GameDetailsResponse<RoundFinishedState>),
     #[serde(rename = "gameDeleted")]
     GameDeleted(IdResponse),
     #[serde(rename = "error")]
@@ -73,43 +78,80 @@ pub(crate) struct GameDetailsResponse<S: Serialize> {
     game: ObfuscatedGame<S>,
 }
 
-impl<S: Serialize> GameDetailsResponse<S> {
-    fn json_from_obfuscated_game_state(id: &str, game: ObfuscatedGame<S>) -> String {
-        let response = GameDetailsResponse {
-            id: id.to_string(),
-            game,
+impl GameDetailsResponse<CardExchangeState> {
+    pub(crate) fn new(
+        id: &str,
+        game: &Game,
+        player: &str,
+        step: &GameStep<game::CardExchangeState>,
+    ) -> GameDetailsResponse<CardExchangeState> {
+        let state = CardExchangeState {
+            player_exchange_cards: get_obfuscated_exchange_cards(
+                &step.state.cards_to_exchange,
+                player,
+            ),
+            your_exchange_cards: step.state.cards_to_exchange[player].clone(),
         };
-        serde_json::to_string(&response).unwrap()
+        let obfuscated_game = ObfuscatedGame::new(game, &step, state, player);
+        GameDetailsResponse {
+            id: id.to_string(),
+            game: obfuscated_game,
+        }
     }
 }
 
-pub(crate) fn game_to_json(id: &str, game: &Game, player: &str) -> String {
-    match game.state.as_ref().unwrap() {
-        CardExchange(step) => {
-            let state = CardExchangeState {
-                player_exchange_cards: get_obfuscated_exchange_cards(
-                    &step.state.cards_to_exchange,
-                    player,
-                ),
-                your_exchange_cards: step.state.cards_to_exchange[player].clone(),
-            };
-            let obfuscated_game = ObfuscatedGame::new(game, &step, state, player);
-            GameDetailsResponse::json_from_obfuscated_game_state(id, obfuscated_game)
+impl GameDetailsResponse<RoundInProgressState> {
+    pub(crate) fn new(
+        id: &str,
+        game: &Game,
+        player: &str,
+        step: &GameStep<game::RoundInProgressState>,
+    ) -> GameDetailsResponse<RoundInProgressState> {
+        let state = RoundInProgressState {
+            cards_on_table: step.state.cards_on_table.clone(),
+        };
+        let obfuscated_game = ObfuscatedGame::new(game, &step, state, player);
+        GameDetailsResponse {
+            id: id.to_string(),
+            game: obfuscated_game,
         }
+    }
+}
+
+impl GameDetailsResponse<RoundFinishedState> {
+    pub(crate) fn new(
+        id: &str,
+        game: &Game,
+        player: &str,
+        step: &GameStep<game::RoundFinishedState>,
+    ) -> GameDetailsResponse<RoundFinishedState> {
+        let state = RoundFinishedState {
+            players_ready: step.state.players_ready.clone(),
+        };
+        let obfuscated_game = ObfuscatedGame::new(game, &step, state, player);
+        GameDetailsResponse {
+            id: id.to_string(),
+            game: obfuscated_game,
+        }
+    }
+}
+
+pub(crate) fn get_obfuscated_game_details_json(id: &str, game: &Game, player: &str) -> String {
+    match &game.state {
+        CardExchange(step) => GameDetailsCardExchange(
+            GameDetailsResponse::<CardExchangeState>::new(id, &game, player, &step),
+        )
+        .to_json(),
         RoundInProgress(step) => {
-            let state = RoundInProgressState {
-                cards_on_table: step.state.cards_on_table.clone(),
-            };
-            let obfuscated_game = ObfuscatedGame::new(game, &step, state, player);
-            GameDetailsResponse::json_from_obfuscated_game_state(id, obfuscated_game)
+            GameDetailsRoundInProgress(GameDetailsResponse::<RoundInProgressState>::new(
+                id, &game, player, &step,
+            ))
+            .to_json()
         }
-        RoundFinished(step) => {
-            let state = RoundFinishedState {
-                players_ready: step.state.players_ready.clone(),
-            };
-            let obfuscated_game = ObfuscatedGame::new(game, &step, state, player);
-            GameDetailsResponse::json_from_obfuscated_game_state(id, obfuscated_game)
-        }
+        RoundFinished(step) => GameDetailsRoundFinished(
+            GameDetailsResponse::<RoundFinishedState>::new(id, &game, player, &step),
+        )
+        .to_json(),
     }
 }
 
@@ -118,6 +160,8 @@ pub(crate) struct ObfuscatedGame<S: Serialize> {
     settings: GameSettings,
     players: Vec<String>,
     scores: HashMap<String, usize>,
+    #[serde(rename = "isFinished")]
+    is_finished: bool,
     #[serde(rename = "playerDecks")]
     player_decks: HashMap<String, usize>,
     #[serde(rename = "yourCards")]
@@ -136,6 +180,7 @@ impl<S: Serialize> ObfuscatedGame<S> {
             settings: game.settings.clone(),
             players: game.players.to_vec(),
             scores: step.scores.clone(),
+            is_finished: game.is_finished,
             player_decks: get_obfuscated_player_cards(&step.player_decks, player),
             your_cards: step.player_decks[player].clone(),
             state,

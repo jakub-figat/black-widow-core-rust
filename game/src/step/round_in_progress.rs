@@ -2,7 +2,6 @@ use crate::card::CardSuit::Heart;
 use crate::card::{Card, CardSuit};
 use crate::error::{GameError, GameResult};
 use crate::payload::PlaceCardPayload;
-use crate::r#trait::PayloadHandler;
 use crate::step::round_finished::RoundFinishedState;
 use crate::step::GameStep;
 use std::collections::HashMap;
@@ -86,6 +85,51 @@ impl GameStep<RoundInProgressState> {
         self.state.current_player = scoring_player;
     }
 
+    pub(crate) fn validate_payload(
+        &self,
+        payload: &PlaceCardPayload,
+        player: &str,
+    ) -> GameResult<()> {
+        self.validate_current_player(player)?;
+        self.validate_player_has_card(&payload.card, &self.state.current_player)?;
+
+        match self.state.table_suit {
+            Some(table_suit) => self.validate_placed_suit(payload.card.suit, table_suit, player),
+            None => {
+                if payload.card.suit == Heart {
+                    self.validate_only_heart_left(player)?
+                }
+
+                Ok(())
+            }
+        }
+    }
+
+    pub(crate) fn dispatch_payload(&mut self, payload: &PlaceCardPayload, player: &str) {
+        self.place_card(&payload.card);
+
+        if self.state.table_suit.is_none() {
+            self.state.table_suit = Some(payload.card.suit);
+        }
+
+        if self.state.cards_on_table.len() == self.players.len() {
+            self.prepare_table_for_next_turn();
+        } else {
+            self.state.current_player = self.player_to_player_map[player].clone();
+        }
+    }
+
+    pub fn handle_payload(
+        &mut self,
+        payload: &PlaceCardPayload,
+        player: &str,
+    ) -> Result<(), GameError> {
+        self.validate_payload(&payload, player)?;
+        self.dispatch_payload(&payload, player);
+
+        Ok(())
+    }
+
     pub fn should_switch(&self) -> bool {
         self.player_decks.iter().all(|(_, cards)| cards.is_empty())
     }
@@ -103,38 +147,6 @@ impl GameStep<RoundInProgressState> {
     }
 }
 
-impl PayloadHandler<'_, PlaceCardPayload> for GameStep<RoundInProgressState> {
-    fn validate_payload(&self, payload: &PlaceCardPayload, player: &str) -> GameResult<()> {
-        self.validate_current_player(player)?;
-        self.validate_player_has_card(&payload.card, &self.state.current_player)?;
-
-        match self.state.table_suit {
-            Some(table_suit) => self.validate_placed_suit(payload.card.suit, table_suit, player),
-            None => {
-                if payload.card.suit == Heart {
-                    self.validate_only_heart_left(player)?
-                }
-
-                Ok(())
-            }
-        }
-    }
-
-    fn dispatch_payload(&mut self, payload: &PlaceCardPayload, player: &str) {
-        self.place_card(&payload.card);
-
-        if self.state.table_suit.is_none() {
-            self.state.table_suit = Some(payload.card.suit);
-        }
-
-        if self.state.cards_on_table.len() == self.players.len() {
-            self.prepare_table_for_next_turn();
-        } else {
-            self.state.current_player = self.player_to_player_map[player].clone();
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct RoundInProgressState {
     pub current_player: String,
@@ -147,6 +159,7 @@ mod tests {
     use super::*;
     use crate::card::CardSuit::{Diamond, Spade};
     use crate::helper::get_player_to_player_map;
+    use std::collections::HashSet;
 
     fn get_players() -> Vec<String> {
         vec!["1".to_string(), "2".to_string(), "3".to_string()]

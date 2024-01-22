@@ -3,14 +3,16 @@ use crate::network::{
     broadcast_game_to_players_or_break, broadcast_text_or_break, send_error_or_break,
     send_text_or_break,
 };
-use crate::payload::{CreateLobbyPayload, GameMovePayload};
+use crate::payload::{
+    CardExchangePayload, ClaimReadinessPayload, CreateLobbyPayload, PlaceCardPayload,
+};
 use crate::response::{
-    game_to_json, GameListResponse, IdResponse, LobbyDetailsResponse, LobbyListResponse,
-    WebSocketResponse::*,
+    get_obfuscated_game_details_json, GameListResponse, IdResponse, LobbyDetailsResponse,
+    LobbyListResponse, WebSocketResponse::*,
 };
 use crate::WebSocketState;
 use axum::extract::ws::Message;
-use game::{Game, GameSettings};
+use game::{CardExchange, Game, GameSettings, RoundFinished, RoundInProgress};
 use std::ops;
 use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc};
@@ -185,11 +187,8 @@ pub(crate) async fn get_game_details(
     match game_hashmap.get(id) {
         Some(game) => match game.players.iter().find(|&s| s.as_str() == player) {
             Some(_) => {
-                send_text_or_break(
-                    &GameDetails(game_to_json(id, game, player)).to_json(),
-                    sender,
-                )
-                .await
+                send_text_or_break(&get_obfuscated_game_details_json(id, &game, player), sender)
+                    .await
             }
             None => {
                 send_error_or_break(&format!("You don't belong to game with id {}", id), sender)
@@ -200,8 +199,8 @@ pub(crate) async fn get_game_details(
     }
 }
 
-pub(crate) async fn game_move(
-    payload: &GameMovePayload,
+pub(crate) async fn card_exchange_move(
+    payload: &CardExchangePayload,
     player: String,
     sender: &mut Sender,
     state: Arc<WebSocketState>,
@@ -216,11 +215,159 @@ pub(crate) async fn game_move(
                 .await;
             }
 
-            match game.dispatch_payload(&payload.game_payload, &player) {
-                Ok(_) => {
-                    broadcast_game_to_players_or_break(&payload.id, &game, state.clone()).await
+            if game.is_finished {
+                return send_error_or_break("Game is already finished", sender).await;
+            }
+
+            match &mut game.state {
+                CardExchange(step) => {
+                    let game_payload = game::CardExchangePayload {
+                        cards_to_exchange: payload.cards_to_exchange.clone(),
+                    };
+                    match step.handle_payload(&game_payload, &player) {
+                        Ok(_) => match step.should_switch() {
+                            true => {
+                                game.state = RoundInProgress(step.clone().to_round_in_progress());
+                                broadcast_game_to_players_or_break(
+                                    &payload.id,
+                                    &game,
+                                    state.clone(),
+                                )
+                                .await
+                            }
+                            false => {
+                                broadcast_game_to_players_or_break(
+                                    &payload.id,
+                                    &game,
+                                    state.clone(),
+                                )
+                                .await
+                            }
+                        },
+                        Err(error) => send_error_or_break(&error.to_string(), sender).await,
+                    }
                 }
-                Err(game_error) => send_error_or_break(&game_error.to_string(), sender).await,
+                _ => {
+                    send_error_or_break("Invalid game action, expected CardExchangeMove", sender)
+                        .await
+                }
+            }
+        }
+        None => {
+            send_error_or_break(
+                &format!("Game with id {} does not exist", payload.id),
+                sender,
+            )
+            .await
+        }
+    }
+}
+
+pub(crate) async fn place_card_move(
+    payload: &PlaceCardPayload,
+    player: String,
+    sender: &mut Sender,
+    state: Arc<WebSocketState>,
+) -> ControlFlow {
+    match state.games.lock().await.get_mut(&payload.id) {
+        Some(game) => {
+            if !game.players.contains(&player) {
+                return send_error_or_break(
+                    &format!("You don't participate in game with id {}", payload.id),
+                    sender,
+                )
+                .await;
+            }
+
+            if game.is_finished {
+                return send_error_or_break("Game is already finished", sender).await;
+            }
+
+            match &mut game.state {
+                RoundInProgress(step) => {
+                    let game_payload = game::PlaceCardPayload {
+                        card: payload.card.clone(),
+                    };
+                    match step.handle_payload(&game_payload, &player) {
+                        Ok(_) => match step.should_switch() {
+                            true => {
+                                game.state = RoundFinished(step.clone().to_round_finished());
+                                broadcast_game_to_players_or_break(
+                                    &payload.id,
+                                    &game,
+                                    state.clone(),
+                                )
+                                .await
+                            }
+                            false => {
+                                broadcast_game_to_players_or_break(
+                                    &payload.id,
+                                    &game,
+                                    state.clone(),
+                                )
+                                .await
+                            }
+                        },
+                        Err(error) => send_error_or_break(&error.to_string(), sender).await,
+                    }
+                }
+                _ => {
+                    send_error_or_break("Invalid game action, expected RoundInProgress", sender)
+                        .await
+                }
+            }
+        }
+        None => {
+            send_error_or_break(
+                &format!("Game with id {} does not exist", payload.id),
+                sender,
+            )
+            .await
+        }
+    }
+}
+
+pub(crate) async fn claim_readiness_move(
+    payload: &ClaimReadinessPayload,
+    player: String,
+    sender: &mut Sender,
+    state: Arc<WebSocketState>,
+) -> ControlFlow {
+    match state.games.lock().await.get_mut(&payload.id) {
+        Some(game) => {
+            if !game.players.contains(&player) {
+                return send_error_or_break(
+                    &format!("You don't participate in game with id {}", payload.id),
+                    sender,
+                )
+                .await;
+            }
+
+            if game.is_finished {
+                return send_error_or_break("Game is already finished", sender).await;
+            }
+
+            match &mut game.state {
+                RoundFinished(step) => {
+                    let game_payload = game::ClaimReadinessPayload {
+                        ready: payload.ready,
+                    };
+                    step.handle_payload(&game_payload, &player);
+                    match step.should_switch() {
+                        true => {
+                            game.state = CardExchange(step.clone().to_card_exchange());
+                            broadcast_game_to_players_or_break(&payload.id, &game, state.clone())
+                                .await
+                        }
+                        false => {
+                            broadcast_game_to_players_or_break(&payload.id, &game, state.clone())
+                                .await
+                        }
+                    }
+                }
+                _ => {
+                    send_error_or_break("Invalid game action, expected RoundFinished", sender).await
+                }
             }
         }
         None => {
@@ -267,7 +414,7 @@ pub(crate) async fn quit_game(
 async fn remove_player_from_game(player: String, game: &mut Game) -> Option<()> {
     let index = game.players.iter().position(|p| p == &player).unwrap();
     game.players.remove(index);
-    game.finished = true;
+    game.is_finished = true;
 
     match game.players.len() {
         0 => Some(()),

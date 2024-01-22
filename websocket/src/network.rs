@@ -1,5 +1,5 @@
-use crate::response::game_to_json;
-use crate::response::WebSocketResponse::{Error, GameDetails};
+use crate::response::get_obfuscated_game_details_json;
+use crate::response::WebSocketResponse::Error;
 use crate::WebSocketState;
 use axum::extract::ws::Message;
 use game::Game;
@@ -32,18 +32,18 @@ pub(crate) fn broadcast_text_or_break(
     ControlFlow::Continue(())
 }
 
-pub(crate) async fn broadcast_text_to_players_or_break(
-    text: &str,
-    players: &[String],
-    state: Arc<WebSocketState>,
-) -> ControlFlow {
-    let player_connections = state.player_connections.read().await;
-    for player in players {
-        let mut sender = player_connections.get(player).unwrap().clone();
-        send_text_or_break(text, &mut sender).await?
-    }
-    ControlFlow::Continue(())
-}
+// pub(crate) async fn broadcast_text_to_players_or_break(
+//     text: &str,
+//     players: &[String],
+//     state: Arc<WebSocketState>,
+// ) -> ControlFlow {
+//     let player_connections = state.player_connections.read().await;
+//     for player in players {
+//         let mut sender = player_connections.get(player).unwrap().clone();
+//         send_text_or_break(text, &mut sender).await?
+//     }
+//     ControlFlow::Continue(())
+// }
 
 pub(crate) async fn broadcast_game_to_players_or_break(
     id: &str,
@@ -54,7 +54,7 @@ pub(crate) async fn broadcast_game_to_players_or_break(
     for player in &game.players {
         let mut sender = player_connections.get(player).unwrap().clone();
         send_text_or_break(
-            &GameDetails(game_to_json(id, game, player)).to_json(),
+            &get_obfuscated_game_details_json(id, game, player),
             &mut sender,
         )
         .await?

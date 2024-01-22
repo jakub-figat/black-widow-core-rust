@@ -1,5 +1,4 @@
 use crate::error::ValidationError;
-use crate::payload::IdPayload;
 use game::Card;
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;

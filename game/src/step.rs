@@ -49,7 +49,6 @@ mod tests {
     use super::*;
     use crate::card::CardSuit::{Club, Spade};
     use crate::payload::{CardExchangePayload, PlaceCardPayload};
-    use crate::r#trait::PayloadHandler;
 
     fn get_players() -> Vec<String> {
         vec!["1".to_string(), "2".to_string(), "3".to_string()]
@@ -208,7 +207,7 @@ mod tests {
         round_in_progress_step.dispatch_payload(&payload, "2");
         assert!(round_in_progress_step.should_switch());
 
-        // game finished
+        // game is_finished
         let round_finished_step = round_in_progress_step.to_round_finished();
         assert!(!round_finished_step.should_switch());
         assert!(round_finished_step.game_finished(10));

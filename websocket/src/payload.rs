@@ -1,4 +1,6 @@
+use game::Card;
 use serde::Deserialize;
+use std::collections::HashSet;
 
 #[derive(Deserialize)]
 #[serde(tag = "action")]
@@ -17,8 +19,12 @@ pub(crate) enum WebSocketPayload {
     ListGames,
     #[serde(rename = "getGameDetails")]
     GetGameDetails(IdPayload),
-    #[serde(rename = "gameMove")]
-    GameMove(GameMovePayload),
+    #[serde(rename = "cardExchangeMove")]
+    CardExchangeMove(CardExchangePayload),
+    #[serde(rename = "placeCardMove")]
+    PlaceCardMove(PlaceCardPayload),
+    #[serde(rename = "claimReadinessMove")]
+    ClaimReadinessMove(ClaimReadinessPayload),
     #[serde(rename = "quitGame")]
     QuitGame(IdPayload),
 }
@@ -37,8 +43,20 @@ pub(crate) struct CreateLobbyPayload {
 }
 
 #[derive(Deserialize)]
-pub(crate) struct GameMovePayload {
+pub(crate) struct CardExchangePayload {
     pub(crate) id: String,
-    #[serde(rename = "gamePayload")]
-    pub(crate) game_payload: String,
+    #[serde(rename = "cardsToExchange")]
+    pub(crate) cards_to_exchange: HashSet<Card>,
+}
+
+#[derive(Deserialize)]
+pub(crate) struct PlaceCardPayload {
+    pub(crate) id: String,
+    pub(crate) card: Card,
+}
+
+#[derive(Deserialize)]
+pub(crate) struct ClaimReadinessPayload {
+    pub(crate) id: String,
+    pub(crate) ready: bool,
 }

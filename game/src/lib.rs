@@ -4,9 +4,12 @@ pub mod game;
 mod helper;
 mod payload;
 pub mod step;
-mod r#trait;
 
 pub use card::Card;
 pub use error::{GameError, GameResult};
-pub use game::GameState::{CardExchange, RoundFinished, RoundInProgress};
+pub use game::GameState::{self, CardExchange, RoundFinished, RoundInProgress};
 pub use game::{Game, GameSettings};
+pub use payload::{CardExchangePayload, ClaimReadinessPayload, PlaceCardPayload};
+pub use step::card_exchange::CardExchangeState;
+pub use step::round_finished::RoundFinishedState;
+pub use step::round_in_progress::RoundInProgressState;
