@@ -1,4 +1,3 @@
-use crate::error::ValidationError;
 use serde::Serialize;
 
 #[derive(Serialize, Clone)]
@@ -15,9 +14,9 @@ impl Lobby {
         max_players: usize,
         max_score: usize,
         player: &str,
-    ) -> Result<Lobby, ValidationError> {
+    ) -> Result<Lobby, String> {
         if max_players < 3 || max_players > 4 {
-            Err(ValidationError("Invalid lobby max players".to_string()))?
+            Err("Invalid lobby max players".to_string())?
         }
 
         Ok(Lobby {

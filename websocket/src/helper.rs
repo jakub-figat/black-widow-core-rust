@@ -1,8 +1,5 @@
-use crate::error::ValidationError;
 use game::Card;
 use std::collections::{HashMap, HashSet};
-use std::str::FromStr;
-use uuid::Uuid;
 
 pub(crate) fn get_obfuscated_player_cards(
     decks: &HashMap<String, HashSet<Card>>,
@@ -24,11 +21,4 @@ pub(crate) fn get_obfuscated_exchange_cards(
         .filter(|(k, _)| k.as_str() != player)
         .map(|(k, v)| (k.clone(), !v.is_empty()))
         .collect()
-}
-
-pub(crate) fn parse_uuid(id: &str) -> Result<String, ValidationError> {
-    match Uuid::from_str(&id) {
-        Ok(parsed_uuid) => Ok(parsed_uuid.to_string()),
-        Err(error) => Err(ValidationError(error.to_string())),
-    }
 }

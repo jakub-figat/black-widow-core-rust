@@ -1,6 +1,9 @@
 use game::Card;
-use serde::Deserialize;
+use serde::de;
+use serde::{Deserialize, Deserializer};
 use std::collections::HashSet;
+use std::str::FromStr;
+use uuid::Uuid;
 
 #[derive(Deserialize)]
 #[serde(tag = "action")]
@@ -31,6 +34,7 @@ pub(crate) enum WebSocketPayload {
 
 #[derive(Deserialize)]
 pub(crate) struct IdPayload {
+    #[serde(deserialize_with = "from_uuid")]
     pub(crate) id: String,
 }
 
@@ -44,6 +48,7 @@ pub(crate) struct CreateLobbyPayload {
 
 #[derive(Deserialize)]
 pub(crate) struct CardExchangePayload {
+    #[serde(deserialize_with = "from_uuid")]
     pub(crate) id: String,
     #[serde(rename = "cardsToExchange")]
     pub(crate) cards_to_exchange: HashSet<Card>,
@@ -51,12 +56,25 @@ pub(crate) struct CardExchangePayload {
 
 #[derive(Deserialize)]
 pub(crate) struct PlaceCardPayload {
+    #[serde(deserialize_with = "from_uuid")]
     pub(crate) id: String,
     pub(crate) card: Card,
 }
 
 #[derive(Deserialize)]
 pub(crate) struct ClaimReadinessPayload {
+    #[serde(deserialize_with = "from_uuid")]
     pub(crate) id: String,
     pub(crate) ready: bool,
+}
+
+fn from_uuid<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let uuid_string = Deserialize::deserialize(deserializer)?;
+    match Uuid::from_str(uuid_string) {
+        Ok(uuid) => Ok(uuid.to_string()),
+        Err(error) => Err(de::Error::custom(error.to_string())),
+    }
 }

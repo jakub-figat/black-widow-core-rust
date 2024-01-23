@@ -1,8 +1,7 @@
+use crate::error::HandlerError::{ActionError, SenderError};
+use crate::error::HandlerResult;
 use crate::lobby::Lobby;
-use crate::network::{
-    broadcast_game_to_players_or_break, broadcast_text_or_break, send_error_or_break,
-    send_text_or_break,
-};
+use crate::network::{broadcast_game_to_players_or_break, broadcast_text, send_text};
 use crate::payload::{
     CardExchangePayload, ClaimReadinessPayload, CreateLobbyPayload, PlaceCardPayload,
 };
@@ -13,91 +12,87 @@ use crate::response::{
 use crate::WebSocketState;
 use axum::extract::ws::Message;
 use game::{CardExchange, Game, GameSettings, RoundFinished, RoundInProgress};
-use std::ops;
 use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc};
 use uuid::Uuid;
 
-type ControlFlow = ops::ControlFlow<(), ()>;
 type Sender = mpsc::Sender<Message>;
 type BroadcastSender = broadcast::Sender<Message>;
 
-pub(crate) async fn list_lobbies(sender: &mut Sender, state: Arc<WebSocketState>) -> ControlFlow {
+pub(crate) async fn list_lobbies(sender: &mut Sender, state: Arc<WebSocketState>) -> HandlerResult {
     let lobbies = state.lobbies.lock().await;
     let response = LobbyList(LobbyListResponse {
         lobbies: lobbies.clone(),
     });
-    send_text_or_break(&response.to_json(), sender).await;
-    ControlFlow::Continue(())
+    send_text(&response.to_json(), sender)
+        .await
+        .map_err(SenderError)
 }
 
 pub(crate) async fn get_lobby_details(
     id: &str,
     sender: &mut Sender,
     state: Arc<WebSocketState>,
-) -> ControlFlow {
+) -> HandlerResult {
     let lobbies = state.lobbies.lock().await;
-    match lobbies.get(id) {
-        Some(lobby) => {
-            let response = LobbyDetails(LobbyDetailsResponse {
-                lobby: lobby.clone(),
-            });
-            send_text_or_break(&response.to_json(), sender).await
-        }
-        None => send_error_or_break(&format!("Lobby with id {} not found", &id), sender).await,
-    }
+    let lobby = lobbies
+        .get(id)
+        .ok_or(ActionError(format!("Lobby with id {} not found", &id)))?;
+
+    let response = LobbyDetails(LobbyDetailsResponse {
+        lobby: lobby.clone(),
+    });
+
+    send_text(&response.to_json(), sender)
+        .await
+        .map_err(SenderError)
 }
 
 pub(crate) async fn create_lobby(
     payload: &CreateLobbyPayload,
     player: &str,
-    sender: &mut Sender,
     broadcast_sender: &mut BroadcastSender,
     state: Arc<WebSocketState>,
-) -> ControlFlow {
-    match Lobby::new_by_player(payload.max_players, payload.max_score, player) {
-        Ok(lobby) => {
-            let mut lobbies = state.lobbies.lock().await;
-            lobbies.insert(Uuid::new_v4().to_string(), lobby.clone());
+) -> HandlerResult {
+    let lobby = Lobby::new_by_player(payload.max_players, payload.max_score, player)
+        .map_err(ActionError)?;
+    let mut lobbies = state.lobbies.lock().await;
+    lobbies.insert(Uuid::new_v4().to_string(), lobby.clone());
 
-            let response = LobbyDetails(LobbyDetailsResponse {
-                lobby: lobby.clone(),
-            });
-            broadcast_text_or_break(&response.to_json(), broadcast_sender)
-        }
-        Err(error) => send_error_or_break(&error.to_string(), sender).await,
-    }
+    let response = LobbyDetails(LobbyDetailsResponse {
+        lobby: lobby.clone(),
+    });
+    broadcast_text(&response.to_json(), broadcast_sender).map_err(SenderError)
 }
 
 pub(crate) async fn join_lobby(
     id: &str,
     player: &str,
-    sender: &mut Sender,
     broadcast_sender: &mut BroadcastSender,
     state: Arc<WebSocketState>,
-) -> ControlFlow {
+) -> HandlerResult {
     let mut lobbies = state.lobbies.lock().await;
+    let lobby = lobbies
+        .get_mut(id)
+        .ok_or(ActionError(format!("Lobby with id {} not found", &id)))?;
 
-    match lobbies.get_mut(id) {
-        Some(lobby) => match add_player_to_lobby(lobby, player, state.clone()).await {
-            Some((game_id, game)) => {
-                lobbies.remove(id);
+    if let Some((game_id, game)) = add_player_to_lobby(lobby, player, state.clone()).await {
+        lobbies.remove(id);
 
-                broadcast_text_or_break(
-                    &LobbyDeleted(IdResponse { id: id.to_string() }).to_json(),
-                    broadcast_sender,
-                )?;
-                broadcast_game_to_players_or_break(&game_id, &game, state.clone()).await
-            }
-            None => {
-                let response = LobbyDetails(LobbyDetailsResponse {
-                    lobby: lobby.clone(),
-                });
-                broadcast_text_or_break(&response.to_json(), broadcast_sender)
-            }
-        },
-        None => send_error_or_break(&format!("Lobby with id {} not found", &id), sender).await,
+        broadcast_text(
+            &LobbyDeleted(IdResponse { id: id.to_string() }).to_json(),
+            broadcast_sender,
+        )
+        .map_err(SenderError)?;
+        return broadcast_game_to_players_or_break(&game_id, &game, state.clone())
+            .await
+            .map_err(SenderError);
     }
+
+    let response = LobbyDetails(LobbyDetailsResponse {
+        lobby: lobby.clone(),
+    });
+    broadcast_text(&response.to_json(), broadcast_sender).map_err(SenderError)
 }
 
 async fn add_player_to_lobby(
@@ -130,36 +125,34 @@ async fn add_player_to_lobby(
 pub(crate) async fn quit_lobby(
     id: &str,
     player: &str,
-    sender: &mut Sender,
     broadcast_sender: &mut BroadcastSender,
     state: Arc<WebSocketState>,
-) -> ControlFlow {
+) -> HandlerResult {
     let player = player.to_string();
     let mut lobbies = state.lobbies.lock().await;
-    match lobbies.get_mut(id) {
-        Some(mut lobby) => {
-            if !lobby.players.contains(&player) {
-                return send_error_or_break(
-                    &format!("You don't belong to lobby with id {}", &id),
-                    sender,
-                )
-                .await;
-            }
+    let mut lobby = lobbies
+        .get_mut(id)
+        .ok_or(ActionError(format!("Lobby with id {} not found", &id)))?;
 
-            let response = match remove_player_from_lobby(player, &mut lobby).await {
-                Some(_) => {
-                    lobbies.remove(id);
-                    LobbyDeleted(IdResponse { id: id.to_string() }).to_json()
-                }
-                None => LobbyDetails(LobbyDetailsResponse {
-                    lobby: lobby.clone(),
-                })
-                .to_json(),
-            };
-            broadcast_text_or_break(&response, broadcast_sender)
-        }
-        None => send_error_or_break(&format!("Lobby with id {} not found", &id), sender).await,
+    if !lobby.players.contains(&player) {
+        return Err(ActionError(format!(
+            "You don't belong to lobby with id {}",
+            &id
+        )));
     }
+
+    let response = match remove_player_from_lobby(player, &mut lobby).await {
+        Some(_) => {
+            lobbies.remove(id);
+            LobbyDeleted(IdResponse { id: id.to_string() }).to_json()
+        }
+        None => LobbyDetails(LobbyDetailsResponse {
+            lobby: lobby.clone(),
+        })
+        .to_json(),
+    };
+
+    broadcast_text(&response, broadcast_sender).map_err(SenderError)
 }
 
 async fn remove_player_from_lobby(player: String, lobby: &mut Lobby) -> Option<()> {
@@ -171,243 +164,213 @@ async fn remove_player_from_lobby(player: String, lobby: &mut Lobby) -> Option<(
     }
 }
 
-pub(crate) async fn list_games(sender: &mut Sender, state: Arc<WebSocketState>) -> ControlFlow {
+pub(crate) async fn list_games(sender: &mut Sender, state: Arc<WebSocketState>) -> HandlerResult {
     let game_hashmap = state.games.lock().await;
     let response = GameList(GameListResponse::from_game_hashmap(&game_hashmap)).to_json();
-    send_text_or_break(&response, sender).await
+    send_text(&response, sender).await.map_err(SenderError)
 }
 
 pub(crate) async fn get_game_details(
     id: &str,
-    player: &str,
+    player: String,
     sender: &mut Sender,
     state: Arc<WebSocketState>,
-) -> ControlFlow {
-    let game_hashmap = state.games.lock().await;
-    match game_hashmap.get(id) {
-        Some(game) => match game.players.iter().find(|&s| s.as_str() == player) {
-            Some(_) => {
-                send_text_or_break(&get_obfuscated_game_details_json(id, &game, player), sender)
-                    .await
-            }
-            None => {
-                send_error_or_break(&format!("You don't belong to game with id {}", id), sender)
-                    .await
-            }
-        },
-        None => send_error_or_break(&format!("Game with id {} does not exist", id), sender).await,
+) -> HandlerResult {
+    let games = state.games.lock().await;
+    let game = games
+        .get(id)
+        .ok_or(ActionError(format!("Game with id {} does not exist", id)))?;
+
+    if !game.players.contains(&player) {
+        return Err(ActionError(format!(
+            "You don't participate in game with id {}",
+            id
+        )));
     }
+
+    send_text(
+        &get_obfuscated_game_details_json(id, &game, &player),
+        sender,
+    )
+    .await
+    .map_err(SenderError)
 }
 
 pub(crate) async fn card_exchange_move(
     payload: &CardExchangePayload,
     player: String,
-    sender: &mut Sender,
     state: Arc<WebSocketState>,
-) -> ControlFlow {
-    match state.games.lock().await.get_mut(&payload.id) {
-        Some(game) => {
-            if !game.players.contains(&player) {
-                return send_error_or_break(
-                    &format!("You don't participate in game with id {}", payload.id),
-                    sender,
-                )
-                .await;
-            }
+) -> HandlerResult {
+    let mut games = state.games.lock().await;
+    let game = games.get_mut(&payload.id).ok_or(ActionError(format!(
+        "Game with id {} does not exist",
+        &payload.id
+    )))?;
 
-            if game.is_finished {
-                return send_error_or_break("Game is already finished", sender).await;
-            }
+    if !game.players.contains(&player) {
+        return Err(ActionError(format!(
+            "You don't participate in game with id {}",
+            &payload.id
+        )));
+    }
 
-            match &mut game.state {
-                CardExchange(step) => {
-                    let game_payload = game::CardExchangePayload {
-                        cards_to_exchange: payload.cards_to_exchange.clone(),
-                    };
-                    match step.handle_payload(&game_payload, &player) {
-                        Ok(_) => match step.should_switch() {
-                            true => {
-                                game.state = RoundInProgress(step.clone().to_round_in_progress());
-                                broadcast_game_to_players_or_break(
-                                    &payload.id,
-                                    &game,
-                                    state.clone(),
-                                )
-                                .await
-                            }
-                            false => {
-                                broadcast_game_to_players_or_break(
-                                    &payload.id,
-                                    &game,
-                                    state.clone(),
-                                )
-                                .await
-                            }
-                        },
-                        Err(error) => send_error_or_break(&error.to_string(), sender).await,
-                    }
-                }
-                _ => {
-                    send_error_or_break("Invalid game action, expected CardExchangeMove", sender)
+    if game.is_finished {
+        return Err(ActionError("Game is already finished".to_string()));
+    }
+
+    match &mut game.state {
+        CardExchange(step) => {
+            let game_payload = game::CardExchangePayload {
+                cards_to_exchange: payload.cards_to_exchange.clone(),
+            };
+
+            step.handle_payload(&game_payload, &player)
+                .map_err(|e| ActionError(e.to_string()))?;
+
+            match step.should_switch() {
+                true => {
+                    game.state = RoundInProgress(step.clone().to_round_in_progress());
+                    broadcast_game_to_players_or_break(&payload.id, &game, state.clone())
                         .await
+                        .map_err(SenderError)
                 }
+                false => broadcast_game_to_players_or_break(&payload.id, &game, state.clone())
+                    .await
+                    .map_err(SenderError),
             }
         }
-        None => {
-            send_error_or_break(
-                &format!("Game with id {} does not exist", payload.id),
-                sender,
-            )
-            .await
-        }
+        _ => Err(ActionError(
+            "Invalid game action, expected CardExchangeMove".to_string(),
+        )),
     }
 }
 
 pub(crate) async fn place_card_move(
     payload: &PlaceCardPayload,
     player: String,
-    sender: &mut Sender,
     state: Arc<WebSocketState>,
-) -> ControlFlow {
-    match state.games.lock().await.get_mut(&payload.id) {
-        Some(game) => {
-            if !game.players.contains(&player) {
-                return send_error_or_break(
-                    &format!("You don't participate in game with id {}", payload.id),
-                    sender,
-                )
-                .await;
-            }
+) -> HandlerResult {
+    let mut games = state.games.lock().await;
+    let game = games.get_mut(&payload.id).ok_or(ActionError(format!(
+        "Game with id {} does not exist",
+        &payload.id
+    )))?;
 
-            if game.is_finished {
-                return send_error_or_break("Game is already finished", sender).await;
-            }
+    if !game.players.contains(&player) {
+        return Err(ActionError(format!(
+            "You don't participate in game with id {}",
+            &payload.id
+        )));
+    }
 
-            match &mut game.state {
-                RoundInProgress(step) => {
-                    let game_payload = game::PlaceCardPayload {
-                        card: payload.card.clone(),
-                    };
-                    match step.handle_payload(&game_payload, &player) {
-                        Ok(_) => match step.should_switch() {
-                            true => {
-                                game.state = RoundFinished(step.clone().to_round_finished());
-                                broadcast_game_to_players_or_break(
-                                    &payload.id,
-                                    &game,
-                                    state.clone(),
-                                )
-                                .await
-                            }
-                            false => {
-                                broadcast_game_to_players_or_break(
-                                    &payload.id,
-                                    &game,
-                                    state.clone(),
-                                )
-                                .await
-                            }
-                        },
-                        Err(error) => send_error_or_break(&error.to_string(), sender).await,
-                    }
-                }
-                _ => {
-                    send_error_or_break("Invalid game action, expected RoundInProgress", sender)
+    if game.is_finished {
+        return Err(ActionError("Game is already finished".to_string()));
+    }
+
+    match &mut game.state {
+        RoundInProgress(step) => {
+            let game_payload = game::PlaceCardPayload {
+                card: payload.card.clone(),
+            };
+
+            step.handle_payload(&game_payload, &player)
+                .map_err(|e| ActionError(e.to_string()))?;
+
+            match step.should_switch() {
+                true => {
+                    game.state = RoundFinished(step.clone().to_round_finished());
+                    broadcast_game_to_players_or_break(&payload.id, &game, state.clone())
                         .await
+                        .map_err(SenderError)
                 }
+                false => broadcast_game_to_players_or_break(&payload.id, &game, state.clone())
+                    .await
+                    .map_err(SenderError),
             }
         }
-        None => {
-            send_error_or_break(
-                &format!("Game with id {} does not exist", payload.id),
-                sender,
-            )
-            .await
-        }
+        _ => Err(ActionError(
+            "Invalid game action, expected RoundInProgress".to_string(),
+        )),
     }
 }
 
 pub(crate) async fn claim_readiness_move(
     payload: &ClaimReadinessPayload,
     player: String,
-    sender: &mut Sender,
     state: Arc<WebSocketState>,
-) -> ControlFlow {
-    match state.games.lock().await.get_mut(&payload.id) {
-        Some(game) => {
-            if !game.players.contains(&player) {
-                return send_error_or_break(
-                    &format!("You don't participate in game with id {}", payload.id),
-                    sender,
-                )
-                .await;
-            }
+) -> HandlerResult {
+    let mut games = state.games.lock().await;
+    let game = games.get_mut(&payload.id).ok_or(ActionError(format!(
+        "Game with id {} does not exist",
+        &payload.id
+    )))?;
 
-            if game.is_finished {
-                return send_error_or_break("Game is already finished", sender).await;
-            }
+    if !game.players.contains(&player) {
+        return Err(ActionError(format!(
+            "You don't participate in game with id {}",
+            &payload.id
+        )));
+    }
 
-            match &mut game.state {
-                RoundFinished(step) => {
-                    let game_payload = game::ClaimReadinessPayload {
-                        ready: payload.ready,
-                    };
-                    step.handle_payload(&game_payload, &player);
-                    match step.should_switch() {
-                        true => {
-                            game.state = CardExchange(step.clone().to_card_exchange());
-                            broadcast_game_to_players_or_break(&payload.id, &game, state.clone())
-                                .await
-                        }
-                        false => {
-                            broadcast_game_to_players_or_break(&payload.id, &game, state.clone())
-                                .await
-                        }
-                    }
+    if game.is_finished {
+        return Err(ActionError("Game is already finished".to_string()));
+    }
+
+    match &mut game.state {
+        RoundFinished(step) => {
+            let game_payload = game::ClaimReadinessPayload {
+                ready: payload.ready,
+            };
+
+            step.handle_payload(&game_payload, &player);
+
+            match step.should_switch() {
+                true => {
+                    game.state = CardExchange(step.clone().to_card_exchange());
+                    broadcast_game_to_players_or_break(&payload.id, &game, state.clone())
+                        .await
+                        .map_err(SenderError)
                 }
-                _ => {
-                    send_error_or_break("Invalid game action, expected RoundFinished", sender).await
-                }
+                false => broadcast_game_to_players_or_break(&payload.id, &game, state.clone())
+                    .await
+                    .map_err(SenderError),
             }
         }
-        None => {
-            send_error_or_break(
-                &format!("Game with id {} does not exist", payload.id),
-                sender,
-            )
-            .await
-        }
+        _ => Err(ActionError(
+            "Invalid game action, expected RoundFinished".to_string(),
+        )),
     }
 }
 
 pub(crate) async fn quit_game(
     id: &str,
     player: String,
-    sender: &mut Sender,
     broadcast_sender: &mut BroadcastSender,
     state: Arc<WebSocketState>,
-) -> ControlFlow {
+) -> HandlerResult {
     let mut games = state.games.lock().await;
-    match games.get_mut(id) {
-        Some(mut game) => {
-            if !game.players.contains(&player) {
-                return send_error_or_break(
-                    &format!("You don't participate in game with id {}", id),
-                    sender,
-                )
-                .await;
-            }
-            // forcefully finish game if the player quits during it
-            match remove_player_from_game(player, &mut game).await {
-                Some(_) => {
-                    games.remove(id);
-                    let response = GameDeleted(IdResponse { id: id.to_string() }).to_json();
-                    broadcast_text_or_break(&response, broadcast_sender)
-                }
-                None => broadcast_game_to_players_or_break(id, &game, state.clone()).await,
-            }
+    let mut game = games
+        .get_mut(id)
+        .ok_or(ActionError(format!("Game with id {} does not exist", id)))?;
+
+    if !game.players.contains(&player) {
+        return Err(ActionError(format!(
+            "You don't participate in game with id {}",
+            id
+        )));
+    }
+
+    // forcefully finish game if the player quits during it
+    match remove_player_from_game(player, &mut game).await {
+        Some(_) => {
+            games.remove(id);
+
+            let response = GameDeleted(IdResponse { id: id.to_string() }).to_json();
+            broadcast_text(&response, broadcast_sender).map_err(SenderError)
         }
-        None => send_error_or_break(&format!("Game with id {} does not exist", id), sender).await,
+        None => broadcast_game_to_players_or_break(id, &game, state.clone())
+            .await
+            .map_err(SenderError),
     }
 }
 

@@ -1,9 +1,9 @@
+use crate::error::HandlerError::{ActionError, SenderError};
 use crate::game_action::{
     card_exchange_move, claim_readiness_move, create_lobby, get_game_details, get_lobby_details,
     join_lobby, list_games, list_lobbies, place_card_move, quit_game, quit_lobby,
 };
-use crate::helper::parse_uuid;
-use crate::network::{send_error_or_break, send_text_or_break};
+use crate::network::send_error;
 use crate::payload::{WebSocketPayload, WebSocketPayload::*};
 use crate::WebSocketState;
 use axum::extract::ws::{Message, WebSocket};
@@ -36,7 +36,7 @@ pub(crate) async fn handle_websocket(
 
     if let Err(text) = add_player_to_connections(user.as_str(), sender.clone(), state.clone()).await
     {
-        send_error_or_break(&text, &mut sender).await;
+        let _ = send_error(&text, &mut sender).await;
         return;
     }
 
@@ -111,13 +111,28 @@ pub(crate) async fn handle_message(
 ) -> ControlFlow<(), ()> {
     let mut broadcast_sender = state.broadcast_sender.clone();
 
-    return match message {
+    match message {
         Message::Text(text) => {
-            handle_text_message(text, player, sender, &mut broadcast_sender, state).await
+            match handle_text_message(text, player, sender, &mut broadcast_sender, state).await {
+                Ok(_) => ControlFlow::Continue(()),
+                Err(text) => {
+                    println!("{}", text);
+                    ControlFlow::Break(())
+                }
+            }
         }
         Message::Close(_) => ControlFlow::Break(()),
-        _ => send_text_or_break("Invalid message", sender).await,
-    };
+        _ => match sender
+            .send(Message::Text("Invalid message type".to_string()))
+            .await
+        {
+            Ok(_) => ControlFlow::Continue(()),
+            Err(error) => {
+                println!("{}", error.to_string());
+                ControlFlow::Break(())
+            }
+        },
+    }
 }
 
 pub(crate) async fn handle_text_message(
@@ -126,54 +141,40 @@ pub(crate) async fn handle_text_message(
     sender: &mut mpsc::Sender<Message>,
     broadcast_sender: &mut broadcast::Sender<Message>,
     state: Arc<WebSocketState>,
-) -> ControlFlow<(), ()> {
-    match serde_json::from_str::<WebSocketPayload>(&text) {
-        Ok(payload) => match payload {
-            ListLobbies => list_lobbies(sender, state).await,
-            GetLobbyDetails(id_payload) => match parse_uuid(&id_payload.id) {
-                Ok(id) => get_lobby_details(&id, sender, state).await,
-                Err(error) => send_error_or_break(&error.to_string(), sender).await,
-            },
-            CreateLobby(create_lobby_payload) => {
-                create_lobby(
-                    &create_lobby_payload,
-                    player,
-                    sender,
-                    broadcast_sender,
-                    state,
-                )
-                .await
-            }
-            JoinLobby(join_lobby_payload) => match parse_uuid(&join_lobby_payload.id) {
-                Ok(id) => join_lobby(&id, player, sender, broadcast_sender, state).await,
-                Err(error) => send_error_or_break(&error.to_string(), sender).await,
-            },
-            QuitLobby(id_payload) => match parse_uuid(&id_payload.id) {
-                Ok(id) => quit_lobby(&id, player, sender, broadcast_sender, state).await,
-                Err(error) => send_error_or_break(&error.to_string(), sender).await,
-            },
-            ListGames => list_games(sender, state).await,
-            GetGameDetails(id_payload) => match parse_uuid(&id_payload.id) {
-                Ok(id) => get_game_details(&id, player, sender, state).await,
-                Err(error) => send_error_or_break(&error.to_string(), sender).await,
-            },
-            CardExchangeMove(payload) => match parse_uuid(&payload.id) {
-                Ok(_) => card_exchange_move(&payload, player.to_string(), sender, state).await,
-                Err(error) => send_error_or_break(&error.to_string(), sender).await,
-            },
-            PlaceCardMove(payload) => match parse_uuid(&payload.id) {
-                Ok(_) => place_card_move(&payload, player.to_string(), sender, state).await,
-                Err(error) => send_error_or_break(&error.to_string(), sender).await,
-            },
-            ClaimReadinessMove(payload) => match parse_uuid(&payload.id) {
-                Ok(_) => claim_readiness_move(&payload, player.to_string(), sender, state).await,
-                Err(error) => send_error_or_break(&error.to_string(), sender).await,
-            },
-            QuitGame(id_payload) => match parse_uuid(&id_payload.id) {
-                Ok(id) => quit_game(&id, player.to_string(), sender, broadcast_sender, state).await,
-                Err(error) => send_error_or_break(&error.to_string(), sender).await,
-            },
-        },
-        Err(error) => send_error_or_break(&error.to_string(), sender).await,
-    }
+) -> Result<(), String> {
+    let payload_result = serde_json::from_str::<WebSocketPayload>(&text);
+    if let Err(error) = payload_result {
+        send_error(&error.to_string(), sender).await?;
+        return Ok(());
+    };
+
+    let handler_result = match payload_result.unwrap() {
+        ListLobbies => list_lobbies(sender, state).await,
+        GetLobbyDetails(payload) => get_lobby_details(&payload.id, sender, state).await,
+        CreateLobby(create_lobby_payload) => {
+            create_lobby(&create_lobby_payload, player, broadcast_sender, state).await
+        }
+        JoinLobby(payload) => join_lobby(&payload.id, player, broadcast_sender, state).await,
+        QuitLobby(payload) => quit_lobby(&payload.id, player, broadcast_sender, state).await,
+        ListGames => list_games(sender, state).await,
+        GetGameDetails(payload) => {
+            get_game_details(&payload.id, player.to_string(), sender, state).await
+        }
+        CardExchangeMove(payload) => card_exchange_move(&payload, player.to_string(), state).await,
+        PlaceCardMove(payload) => place_card_move(&payload, player.to_string(), state).await,
+        ClaimReadinessMove(payload) => {
+            claim_readiness_move(&payload, player.to_string(), state).await
+        }
+        QuitGame(payload) => {
+            quit_game(&payload.id, player.to_string(), broadcast_sender, state).await
+        }
+    };
+
+    if let Err(error) = handler_result {
+        match error {
+            ActionError(text) => send_error(&text, sender).await?,
+            SenderError(error) => Err(error.to_string())?,
+        }
+    };
+    Ok(())
 }
