@@ -105,7 +105,7 @@ async fn wrap_sink(mut sink: SplitSink<WebSocket, Message>, mut receiver: mpsc::
 
 pub(crate) async fn handle_message(
     message: Message,
-    player: &str,
+    player: &String,
     state: Arc<WebSocketState>,
     sender: &mut mpsc::Sender<Message>,
 ) -> ControlFlow<(), ()> {
@@ -137,7 +137,7 @@ pub(crate) async fn handle_message(
 
 pub(crate) async fn handle_text_message(
     text: String,
-    player: &str,
+    player: &String,
     sender: &mut mpsc::Sender<Message>,
     broadcast_sender: &mut broadcast::Sender<Message>,
     state: Arc<WebSocketState>,
@@ -157,14 +157,10 @@ pub(crate) async fn handle_text_message(
         JoinLobby(payload) => join_lobby(&payload.id, player, broadcast_sender, state).await,
         QuitLobby(payload) => quit_lobby(&payload.id, player, broadcast_sender, state).await,
         ListGames => list_games(sender, state).await,
-        GetGameDetails(payload) => {
-            get_game_details(&payload.id, player.to_string(), sender, state).await
-        }
-        CardExchangeMove(payload) => card_exchange_move(&payload, player.to_string(), state).await,
-        PlaceCardMove(payload) => place_card_move(&payload, player.to_string(), state).await,
-        ClaimReadinessMove(payload) => {
-            claim_readiness_move(&payload, player.to_string(), state).await
-        }
+        GetGameDetails(payload) => get_game_details(&payload.id, player, sender, state).await,
+        CardExchangeMove(payload) => card_exchange_move(&payload, player, state).await,
+        PlaceCardMove(payload) => place_card_move(&payload, player, state).await,
+        ClaimReadinessMove(payload) => claim_readiness_move(&payload, player, state).await,
         QuitGame(payload) => {
             quit_game(&payload.id, player.to_string(), broadcast_sender, state).await
         }

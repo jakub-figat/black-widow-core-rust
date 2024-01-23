@@ -172,7 +172,7 @@ pub(crate) async fn list_games(sender: &mut Sender, state: Arc<WebSocketState>) 
 
 pub(crate) async fn get_game_details(
     id: &str,
-    player: String,
+    player: &String,
     sender: &mut Sender,
     state: Arc<WebSocketState>,
 ) -> HandlerResult {
@@ -181,12 +181,7 @@ pub(crate) async fn get_game_details(
         .get(id)
         .ok_or(ActionError(format!("Game with id {} does not exist", id)))?;
 
-    if !game.players.contains(&player) {
-        return Err(ActionError(format!(
-            "You don't participate in game with id {}",
-            id
-        )));
-    }
+    check_player_in_game(id, &game, player)?;
 
     send_text(
         &get_obfuscated_game_details_json(id, &game, &player),
@@ -198,7 +193,7 @@ pub(crate) async fn get_game_details(
 
 pub(crate) async fn card_exchange_move(
     payload: &CardExchangePayload,
-    player: String,
+    player: &String,
     state: Arc<WebSocketState>,
 ) -> HandlerResult {
     let mut games = state.games.lock().await;
@@ -207,16 +202,8 @@ pub(crate) async fn card_exchange_move(
         &payload.id
     )))?;
 
-    if !game.players.contains(&player) {
-        return Err(ActionError(format!(
-            "You don't participate in game with id {}",
-            &payload.id
-        )));
-    }
-
-    if game.is_finished {
-        return Err(ActionError("Game is already finished".to_string()));
-    }
+    check_player_in_game(&payload.id, &game, player)?;
+    check_game_finished(&game)?;
 
     match &mut game.state {
         CardExchange(step) => {
@@ -224,7 +211,7 @@ pub(crate) async fn card_exchange_move(
                 cards_to_exchange: payload.cards_to_exchange.clone(),
             };
 
-            step.handle_payload(&game_payload, &player)
+            step.handle_payload(&game_payload, player)
                 .map_err(|e| ActionError(e.to_string()))?;
 
             match step.should_switch() {
@@ -247,7 +234,7 @@ pub(crate) async fn card_exchange_move(
 
 pub(crate) async fn place_card_move(
     payload: &PlaceCardPayload,
-    player: String,
+    player: &String,
     state: Arc<WebSocketState>,
 ) -> HandlerResult {
     let mut games = state.games.lock().await;
@@ -256,16 +243,8 @@ pub(crate) async fn place_card_move(
         &payload.id
     )))?;
 
-    if !game.players.contains(&player) {
-        return Err(ActionError(format!(
-            "You don't participate in game with id {}",
-            &payload.id
-        )));
-    }
-
-    if game.is_finished {
-        return Err(ActionError("Game is already finished".to_string()));
-    }
+    check_player_in_game(&payload.id, &game, player)?;
+    check_game_finished(&game)?;
 
     match &mut game.state {
         RoundInProgress(step) => {
@@ -273,7 +252,7 @@ pub(crate) async fn place_card_move(
                 card: payload.card.clone(),
             };
 
-            step.handle_payload(&game_payload, &player)
+            step.handle_payload(&game_payload, player)
                 .map_err(|e| ActionError(e.to_string()))?;
 
             match step.should_switch() {
@@ -296,7 +275,7 @@ pub(crate) async fn place_card_move(
 
 pub(crate) async fn claim_readiness_move(
     payload: &ClaimReadinessPayload,
-    player: String,
+    player: &String,
     state: Arc<WebSocketState>,
 ) -> HandlerResult {
     let mut games = state.games.lock().await;
@@ -305,16 +284,8 @@ pub(crate) async fn claim_readiness_move(
         &payload.id
     )))?;
 
-    if !game.players.contains(&player) {
-        return Err(ActionError(format!(
-            "You don't participate in game with id {}",
-            &payload.id
-        )));
-    }
-
-    if game.is_finished {
-        return Err(ActionError("Game is already finished".to_string()));
-    }
+    check_player_in_game(&payload.id, &game, player)?;
+    check_game_finished(&game)?;
 
     match &mut game.state {
         RoundFinished(step) => {
@@ -322,7 +293,7 @@ pub(crate) async fn claim_readiness_move(
                 ready: payload.ready,
             };
 
-            step.handle_payload(&game_payload, &player);
+            step.handle_payload(&game_payload, player);
 
             match step.should_switch() {
                 true => {
@@ -383,6 +354,23 @@ async fn remove_player_from_game(player: String, game: &mut Game) -> Option<()> 
         0 => Some(()),
         _ => None,
     }
+}
+
+fn check_player_in_game(id: &str, game: &Game, player: &String) -> HandlerResult {
+    if !game.players.contains(player) {
+        return Err(ActionError(format!(
+            "You don't participate in game with id {}",
+            id
+        )));
+    }
+    Ok(())
+}
+
+fn check_game_finished(game: &Game) -> HandlerResult {
+    if game.is_finished {
+        return Err(ActionError("Game is already finished".to_string()));
+    }
+    Ok(())
 }
 
 // TODO: maybe redis for shared state if scaling instances
