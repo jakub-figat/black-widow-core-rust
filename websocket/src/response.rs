@@ -8,10 +8,13 @@ use game::{self, Card, CardExchange, Game, GameSettings, RoundFinished, RoundInP
 use serde::Serialize;
 use serde_json::json;
 use std::collections::{HashMap, HashSet};
+use ts_rs::TS;
+use uuid::Uuid;
 
-#[derive(Serialize)]
+#[derive(Serialize, TS)]
+#[ts(export)]
 #[serde(tag = "type")]
-pub(crate) enum WebSocketResponse {
+pub enum WebSocketResponse {
     #[serde(rename = "lobbyList")]
     LobbyList(LobbyListResponse),
     #[serde(rename = "lobbyDetails")]
@@ -32,28 +35,32 @@ pub(crate) enum WebSocketResponse {
     Error(String),
 }
 
-#[derive(Serialize)]
-pub(crate) struct IdResponse {
-    pub(crate) id: String,
+#[derive(Serialize, TS)]
+#[ts(export)]
+pub struct IdResponse {
+    pub id: Uuid,
 }
 
-#[derive(Serialize)]
-pub(crate) struct LobbyListResponse {
-    pub(crate) lobbies: HashMap<String, Lobby>,
+#[derive(Serialize, TS)]
+#[ts(export)]
+pub struct LobbyListResponse {
+    pub lobbies: HashMap<Uuid, Lobby>,
 }
 
-#[derive(Serialize)]
-pub(crate) struct LobbyDetailsResponse {
-    pub(crate) lobby: Lobby,
+#[derive(Serialize, TS)]
+#[ts(export)]
+pub struct LobbyDetailsResponse {
+    pub lobby: Lobby,
 }
 
-#[derive(Serialize)]
-pub(crate) struct GameListResponse {
-    games: Vec<ListedGame>,
+#[derive(Serialize, TS)]
+#[ts(export)]
+pub struct GameListResponse {
+    pub games: Vec<ListedGame>,
 }
 
 impl GameListResponse {
-    pub(crate) fn from_game_hashmap(games: &HashMap<String, Game>) -> GameListResponse {
+    pub(crate) fn from_game_hashmap(games: &HashMap<Uuid, Game>) -> GameListResponse {
         let games: Vec<ListedGame> = games
             .iter()
             .map(|(id, game)| ListedGame {
@@ -66,21 +73,23 @@ impl GameListResponse {
     }
 }
 
-#[derive(Serialize)]
-pub(crate) struct ListedGame {
-    pub(crate) id: String,
-    pub(crate) players: Vec<String>,
+#[derive(Serialize, TS)]
+#[ts(export)]
+pub struct ListedGame {
+    pub id: Uuid,
+    pub players: Vec<String>,
 }
 
-#[derive(Serialize)]
-pub(crate) struct GameDetailsResponse<S: Serialize> {
-    id: String,
-    game: ObfuscatedGame<S>,
+#[derive(Serialize, TS)]
+#[ts(export)]
+pub struct GameDetailsResponse<S: Serialize> {
+    pub id: Uuid,
+    pub game: ObfuscatedGame<S>,
 }
 
 impl GameDetailsResponse<CardExchangeState> {
     pub(crate) fn new(
-        id: &str,
+        id: &Uuid,
         game: &Game,
         player: &str,
         step: &GameStep<game::CardExchangeState>,
@@ -94,7 +103,7 @@ impl GameDetailsResponse<CardExchangeState> {
         };
         let obfuscated_game = ObfuscatedGame::new(game, &step, state, player);
         GameDetailsResponse {
-            id: id.to_string(),
+            id: id.clone(),
             game: obfuscated_game,
         }
     }
@@ -102,7 +111,7 @@ impl GameDetailsResponse<CardExchangeState> {
 
 impl GameDetailsResponse<RoundInProgressState> {
     pub(crate) fn new(
-        id: &str,
+        id: &Uuid,
         game: &Game,
         player: &str,
         step: &GameStep<game::RoundInProgressState>,
@@ -112,7 +121,7 @@ impl GameDetailsResponse<RoundInProgressState> {
         };
         let obfuscated_game = ObfuscatedGame::new(game, &step, state, player);
         GameDetailsResponse {
-            id: id.to_string(),
+            id: id.clone(),
             game: obfuscated_game,
         }
     }
@@ -120,7 +129,7 @@ impl GameDetailsResponse<RoundInProgressState> {
 
 impl GameDetailsResponse<RoundFinishedState> {
     pub(crate) fn new(
-        id: &str,
+        id: &Uuid,
         game: &Game,
         player: &str,
         step: &GameStep<game::RoundFinishedState>,
@@ -130,13 +139,13 @@ impl GameDetailsResponse<RoundFinishedState> {
         };
         let obfuscated_game = ObfuscatedGame::new(game, &step, state, player);
         GameDetailsResponse {
-            id: id.to_string(),
+            id: id.clone(),
             game: obfuscated_game,
         }
     }
 }
 
-pub(crate) fn get_obfuscated_game_details_json(id: &str, game: &Game, player: &str) -> String {
+pub(crate) fn get_obfuscated_game_details_json(id: &Uuid, game: &Game, player: &str) -> String {
     match &game.state {
         CardExchange(step) => GameDetailsCardExchange(
             GameDetailsResponse::<CardExchangeState>::new(id, &game, player, &step),
@@ -155,18 +164,19 @@ pub(crate) fn get_obfuscated_game_details_json(id: &str, game: &Game, player: &s
     }
 }
 
-#[derive(Serialize)]
-pub(crate) struct ObfuscatedGame<S: Serialize> {
-    settings: GameSettings,
-    players: Vec<String>,
-    scores: HashMap<String, usize>,
+#[derive(Serialize, TS)]
+#[ts(export)]
+pub struct ObfuscatedGame<S: Serialize> {
+    pub settings: GameSettings,
+    pub players: Vec<String>,
+    pub scores: HashMap<String, usize>,
     #[serde(rename = "isFinished")]
-    is_finished: bool,
+    pub is_finished: bool,
     #[serde(rename = "playerDecks")]
-    player_decks: HashMap<String, usize>,
+    pub player_decks: HashMap<String, usize>,
     #[serde(rename = "yourCards")]
-    your_cards: HashSet<Card>,
-    state: S,
+    pub your_cards: HashSet<Card>,
+    pub state: S,
 }
 
 impl<S: Serialize> ObfuscatedGame<S> {
@@ -188,24 +198,27 @@ impl<S: Serialize> ObfuscatedGame<S> {
     }
 }
 
-#[derive(Serialize)]
-pub(crate) struct CardExchangeState {
+#[derive(Serialize, TS)]
+#[ts(export)]
+pub struct CardExchangeState {
     #[serde(rename = "playerExchangeCards")]
-    player_exchange_cards: HashMap<String, bool>,
+    pub player_exchange_cards: HashMap<String, bool>,
     #[serde(rename = "yourExchangeCards")]
-    your_exchange_cards: HashSet<Card>,
+    pub your_exchange_cards: HashSet<Card>,
 }
 
-#[derive(Serialize)]
-pub(crate) struct RoundInProgressState {
+#[derive(Serialize, TS)]
+#[ts(export)]
+pub struct RoundInProgressState {
     #[serde(rename = "cardsOnTable")]
-    cards_on_table: HashMap<String, Card>,
+    pub cards_on_table: HashMap<String, Card>,
 }
 
-#[derive(Serialize)]
-pub(crate) struct RoundFinishedState {
+#[derive(Serialize, TS)]
+#[ts(export)]
+pub struct RoundFinishedState {
     #[serde(rename = "playersReady")]
-    players_ready: HashMap<String, bool>,
+    pub players_ready: HashMap<String, bool>,
 }
 
 impl WebSocketResponse {

@@ -4,8 +4,8 @@ mod handler;
 mod helper;
 mod lobby;
 mod network;
-mod payload;
-mod response;
+pub mod payload;
+pub mod response;
 
 use crate::handler::handle;
 use crate::lobby::Lobby;
@@ -18,6 +18,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
+use uuid::Uuid;
 
 pub async fn start_game_server() {
     let state = Arc::new(WebSocketState::new());
@@ -34,8 +35,8 @@ pub async fn start_game_server() {
 }
 
 struct WebSocketState {
-    games: Mutex<HashMap<String, Game>>,
-    lobbies: Mutex<HashMap<String, Lobby>>,
+    games: Mutex<HashMap<Uuid, Game>>,
+    lobbies: Mutex<HashMap<Uuid, Lobby>>,
     player_connections: RwLock<HashMap<String, mpsc::Sender<Message>>>,
     broadcast_sender: broadcast::Sender<Message>,
 }

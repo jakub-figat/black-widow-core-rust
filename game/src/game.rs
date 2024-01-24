@@ -5,6 +5,7 @@ use crate::step::round_finished::RoundFinishedState;
 use crate::step::round_in_progress::RoundInProgressState;
 use crate::step::GameStep;
 use serde::Serialize;
+use ts_rs::TS;
 
 #[derive(Debug, Clone)]
 pub struct Game {
@@ -30,7 +31,8 @@ impl Game {
     }
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, TS)]
+#[ts(export)]
 pub struct GameSettings {
     #[serde(rename = "maxScore")]
     pub max_score: usize,

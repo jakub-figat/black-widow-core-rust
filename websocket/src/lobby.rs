@@ -1,12 +1,14 @@
 use serde::Serialize;
+use ts_rs::TS;
 
-#[derive(Serialize, Clone)]
-pub(crate) struct Lobby {
+#[derive(Serialize, TS, Clone)]
+#[ts(export)]
+pub struct Lobby {
     #[serde(rename = "maxPlayers")]
-    pub(crate) max_players: usize,
+    pub max_players: usize,
     #[serde(rename = "maxScore")]
-    pub(crate) max_score: usize,
-    pub(crate) players: Vec<String>,
+    pub max_score: usize,
+    pub players: Vec<String>,
 }
 
 impl Lobby {

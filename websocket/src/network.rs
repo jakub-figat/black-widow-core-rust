@@ -5,6 +5,7 @@ use axum::extract::ws::Message;
 use game::Game;
 use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc};
+use uuid::Uuid;
 
 pub(crate) async fn send_text(
     text: &str,
@@ -27,7 +28,7 @@ pub(crate) fn broadcast_text(
 }
 
 pub(crate) async fn broadcast_game_to_players_or_break(
-    id: &str,
+    id: &Uuid,
     game: &Game,
     state: Arc<WebSocketState>,
 ) -> Result<(), String> {

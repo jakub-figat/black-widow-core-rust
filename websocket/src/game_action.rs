@@ -30,7 +30,7 @@ pub(crate) async fn list_lobbies(sender: &mut Sender, state: Arc<WebSocketState>
 }
 
 pub(crate) async fn get_lobby_details(
-    id: &str,
+    id: &Uuid,
     sender: &mut Sender,
     state: Arc<WebSocketState>,
 ) -> HandlerResult {
@@ -57,7 +57,7 @@ pub(crate) async fn create_lobby(
     let lobby = Lobby::new_by_player(payload.max_players, payload.max_score, player)
         .map_err(ActionError)?;
     let mut lobbies = state.lobbies.lock().await;
-    lobbies.insert(Uuid::new_v4().to_string(), lobby.clone());
+    lobbies.insert(Uuid::new_v4(), lobby.clone());
 
     let response = LobbyDetails(LobbyDetailsResponse {
         lobby: lobby.clone(),
@@ -66,7 +66,7 @@ pub(crate) async fn create_lobby(
 }
 
 pub(crate) async fn join_lobby(
-    id: &str,
+    id: &Uuid,
     player: &str,
     broadcast_sender: &mut BroadcastSender,
     state: Arc<WebSocketState>,
@@ -80,7 +80,7 @@ pub(crate) async fn join_lobby(
         lobbies.remove(id);
 
         broadcast_text(
-            &LobbyDeleted(IdResponse { id: id.to_string() }).to_json(),
+            &LobbyDeleted(IdResponse { id: id.clone() }).to_json(),
             broadcast_sender,
         )
         .map_err(SenderError)?;
@@ -99,10 +99,10 @@ async fn add_player_to_lobby(
     lobby: &mut Lobby,
     player: &str,
     state: Arc<WebSocketState>,
-) -> Option<(String, Game)> {
+) -> Option<(Uuid, Game)> {
     lobby.players.push(player.to_string());
     if lobby.players.len() == lobby.max_players {
-        let game_id = Uuid::new_v4().to_string();
+        let game_id = Uuid::new_v4();
         let game = Game::from_players(
             &lobby.players,
             GameSettings {
@@ -123,7 +123,7 @@ async fn add_player_to_lobby(
 }
 
 pub(crate) async fn quit_lobby(
-    id: &str,
+    id: &Uuid,
     player: &str,
     broadcast_sender: &mut BroadcastSender,
     state: Arc<WebSocketState>,
@@ -144,7 +144,7 @@ pub(crate) async fn quit_lobby(
     let response = match remove_player_from_lobby(player, &mut lobby).await {
         Some(_) => {
             lobbies.remove(id);
-            LobbyDeleted(IdResponse { id: id.to_string() }).to_json()
+            LobbyDeleted(IdResponse { id: id.clone() }).to_json()
         }
         None => LobbyDetails(LobbyDetailsResponse {
             lobby: lobby.clone(),
@@ -171,7 +171,7 @@ pub(crate) async fn list_games(sender: &mut Sender, state: Arc<WebSocketState>) 
 }
 
 pub(crate) async fn get_game_details(
-    id: &str,
+    id: &Uuid,
     player: &String,
     sender: &mut Sender,
     state: Arc<WebSocketState>,
@@ -314,7 +314,7 @@ pub(crate) async fn claim_readiness_move(
 }
 
 pub(crate) async fn quit_game(
-    id: &str,
+    id: &Uuid,
     player: String,
     broadcast_sender: &mut BroadcastSender,
     state: Arc<WebSocketState>,
@@ -336,7 +336,7 @@ pub(crate) async fn quit_game(
         Some(_) => {
             games.remove(id);
 
-            let response = GameDeleted(IdResponse { id: id.to_string() }).to_json();
+            let response = GameDeleted(IdResponse { id: id.clone() }).to_json();
             broadcast_text(&response, broadcast_sender).map_err(SenderError)
         }
         None => broadcast_game_to_players_or_break(id, &game, state.clone())
@@ -356,7 +356,7 @@ async fn remove_player_from_game(player: String, game: &mut Game) -> Option<()> 
     }
 }
 
-fn check_player_in_game(id: &str, game: &Game, player: &String) -> HandlerResult {
+fn check_player_in_game(id: &Uuid, game: &Game, player: &String) -> HandlerResult {
     if !game.players.contains(player) {
         return Err(ActionError(format!(
             "You don't participate in game with id {}",
