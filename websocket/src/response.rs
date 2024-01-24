@@ -6,7 +6,6 @@ use crate::response::WebSocketResponse::{
 use game::step::GameStep;
 use game::{self, Card, CardExchange, Game, GameSettings, RoundFinished, RoundInProgress};
 use serde::Serialize;
-use serde_json::json;
 use std::collections::{HashMap, HashSet};
 use ts_rs::TS;
 use uuid::Uuid;
@@ -32,7 +31,7 @@ pub enum WebSocketResponse {
     #[serde(rename = "gameDeleted")]
     GameDeleted(IdResponse),
     #[serde(rename = "error")]
-    Error(String),
+    Error(ErrorResponse),
 }
 
 #[derive(Serialize, TS)]
@@ -221,11 +220,14 @@ pub struct RoundFinishedState {
     pub players_ready: HashMap<String, bool>,
 }
 
+#[derive(Serialize, TS)]
+#[ts(export)]
+pub struct ErrorResponse {
+    pub detail: String,
+}
+
 impl WebSocketResponse {
     pub(crate) fn to_json(&self) -> String {
-        match self {
-            WebSocketResponse::Error(text) => json!({"error": text.clone()}).to_string(),
-            _ => serde_json::to_string(self).unwrap(),
-        }
+        serde_json::to_string(self).unwrap()
     }
 }

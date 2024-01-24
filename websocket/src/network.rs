@@ -1,5 +1,5 @@
-use crate::response::get_obfuscated_game_details_json;
 use crate::response::WebSocketResponse::Error;
+use crate::response::{get_obfuscated_game_details_json, ErrorResponse};
 use crate::WebSocketState;
 use axum::extract::ws::Message;
 use game::Game;
@@ -48,5 +48,12 @@ pub(crate) async fn send_error(
     text: &str,
     sender: &mut mpsc::Sender<Message>,
 ) -> Result<(), String> {
-    send_text(&Error(text.to_string()).to_json(), sender).await
+    send_text(
+        &Error(ErrorResponse {
+            detail: text.to_string(),
+        })
+        .to_json(),
+        sender,
+    )
+    .await
 }
