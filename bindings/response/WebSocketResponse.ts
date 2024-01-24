@@ -5,7 +5,7 @@ import type { GameListResponse } from "./GameListResponse";
 import type { IdResponse } from "./IdResponse";
 import type { LobbyDetailsResponse } from "./LobbyDetailsResponse";
 import type { LobbyListResponse } from "./LobbyListResponse";
-import type { RoundFinishedState } from "./RoundFinishedState";
-import type { RoundInProgressState } from "./RoundInProgressState";
+import type { RoundFinishedState } from "../common/RoundFinishedState";
+import type { RoundInProgressState } from "../common/RoundInProgressState";
 
 export type WebSocketResponse = { "type": "lobbyList" } & LobbyListResponse | { "type": "lobbyDetails" } & LobbyDetailsResponse | { "type": "LobbyDeleted" } & IdResponse | { "type": "gameList" } & GameListResponse | { "type": "gameDetailsCardExchange" } & GameDetailsResponse<CardExchangeState> | { "type": "gameDetailsRoundInProgress" } & GameDetailsResponse<RoundInProgressState> | { "type": "gameDetailsCardExchange" } & GameDetailsResponse<RoundFinishedState> | { "type": "gameDeleted" } & IdResponse | { "type": "error" } & string;
