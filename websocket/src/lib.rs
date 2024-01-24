@@ -21,11 +21,12 @@ use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
 use uuid::Uuid;
 
 pub async fn start_game_server() {
+    let port = std::env::var("PORT").unwrap_or("6379".to_string());
     let state = Arc::new(WebSocketState::new());
     let app = Router::new().route("/ws", get(handle)).with_state(state);
 
-    println!("Starting server on port 6379");
-    let listener = TcpListener::bind("0.0.0.0:6379").await.unwrap();
+    println!("Starting server on port {}", port);
+    let listener = TcpListener::bind(format!("0.0.0.0:{}", port)).await.unwrap();
     axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),

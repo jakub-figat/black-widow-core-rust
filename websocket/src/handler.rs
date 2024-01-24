@@ -13,28 +13,37 @@ use futures::stream::{SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
 use std::ops::ControlFlow;
 use std::sync::Arc;
+use axum::http::{HeaderMap, HeaderValue};
 use tokio::sync::{broadcast, mpsc};
-use uuid::Uuid;
 
 pub(crate) async fn handle(
+    headers: HeaderMap,
     websocket: WebSocketUpgrade,
     State(state): State<Arc<WebSocketState>>,
 ) -> impl IntoResponse {
-    // TODO: implement decoding JWT here
-    let user = Uuid::new_v4().to_string();
-    websocket.on_upgrade(move |socket| handle_websocket(socket, user, state))
+
+    websocket.on_upgrade(move |socket| handle_websocket(socket, headers.clone(), state))
 }
 
 pub(crate) async fn handle_websocket(
     websocket: WebSocket,
-    user: String,
+    headers: HeaderMap,
     state: Arc<WebSocketState>,
 ) {
+
     let (sink, stream) = websocket.split();
     let (mut sender, receiver) = mpsc::channel(128);
     tokio::spawn(wrap_sink(sink, receiver));
 
-    if let Err(text) = add_player_to_connections(user.as_str(), sender.clone(), state.clone()).await
+    let user_result = get_user_from_header(headers.get("X-User"));
+    if let Err(text) = user_result {
+        let _ = send_error(&text, &mut sender).await;
+        return;
+    }
+
+    let user = user_result.unwrap();
+
+    if let Err(text) = add_player_to_connections(&user, sender.clone(), state.clone()).await
     {
         let _ = send_error(&text, &mut sender).await;
         return;
@@ -55,11 +64,22 @@ pub(crate) async fn handle_websocket(
     player_connections.remove(&user);
 }
 
+
+fn get_user_from_header(user_header: Option<&HeaderValue>) -> Result<String, String> {
+    let user_header = user_header.ok_or("X-User header not supplied".to_string())?;
+    let user_result = user_header.to_str().map_err(|_| "Could not parse X-User header".to_string())?;
+    Ok(user_result.to_string())
+}
+
 async fn add_player_to_connections(
     player: &str,
     sender: mpsc::Sender<Message>,
     state: Arc<WebSocketState>,
 ) -> Result<(), String> {
+    if player.trim().len() <= 5 {
+        Err("Invalid nickname, should be at least 5 characters long")?
+    }
+
     let mut player_connections = state.player_connections.write().await;
     if player_connections.contains_key(player) {
         Err("This player is already connected")?
