@@ -1,4 +1,4 @@
-use game::Card;
+use game::CardSuit;
 use serde::Deserialize;
 use std::collections::HashSet;
 use ts_rs::TS;
@@ -52,14 +52,14 @@ pub struct CreateLobbyPayload {
 pub struct CardExchangePayload {
     pub(crate) id: Uuid,
     #[serde(rename = "cardsToExchange")]
-    pub(crate) cards_to_exchange: HashSet<Card>,
+    pub(crate) cards_to_exchange: HashSet<InputCard>,
 }
 
 #[derive(Deserialize, TS)]
 #[ts(export)]
 pub struct PlaceCardPayload {
     pub(crate) id: Uuid,
-    pub(crate) card: Card,
+    pub(crate) card: InputCard,
 }
 
 #[derive(Deserialize, TS)]
@@ -67,4 +67,11 @@ pub struct PlaceCardPayload {
 pub struct ClaimReadinessPayload {
     pub(crate) id: Uuid,
     pub(crate) ready: bool,
+}
+
+#[derive(PartialEq, Eq, Hash, Deserialize, TS)]
+#[ts(export)]
+pub struct InputCard {
+    pub(crate) suit: CardSuit,
+    pub(crate) value: usize,
 }

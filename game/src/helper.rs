@@ -11,7 +11,8 @@ pub fn pick_player_with_starting_card(
         3 => Card::new(Club, 3),
         4 => Card::new(Club, 2),
         _ => panic!("Invalid number of players"),
-    };
+    }
+    .unwrap();
 
     for (player, deck) in player_decks {
         if deck.contains(&starting_card) {
@@ -38,12 +39,12 @@ pub fn get_starting_player_decks(players: &[String]) -> HashMap<String, HashSet<
 
     for card_suit in [Spade, Heart, Club, Diamond] {
         for value in 2..=14 {
-            all_cards.insert(Card::new(card_suit, value));
+            all_cards.insert(Card::new(card_suit, value).unwrap());
         }
     }
 
     if players.len() == 3 {
-        all_cards.remove(&Card::new(Club, 2));
+        all_cards.remove(&Card::new(Club, 2).unwrap());
     }
     let mut all_cards = Vec::from_iter(all_cards.iter().cloned());
 
@@ -68,13 +69,22 @@ mod tests {
     #[test]
     fn pick_player_with_starting_card_from_3_decks() {
         let player_decks = HashMap::from([
-            ("1".to_string(), HashSet::from([Card::new(Club, 10)])),
-            ("2".to_string(), HashSet::from([Card::new(Club, 11)])),
-            ("3".to_string(), HashSet::from([Card::new(Club, 3)])),
+            (
+                "1".to_string(),
+                HashSet::from([Card::new(Club, 10).unwrap()]),
+            ),
+            (
+                "2".to_string(),
+                HashSet::from([Card::new(Club, 11).unwrap()]),
+            ),
+            (
+                "3".to_string(),
+                HashSet::from([Card::new(Club, 3).unwrap()]),
+            ),
         ]);
 
         assert_eq!(
-            Some(("3".to_string(), Card::new(Club, 3))),
+            Some(("3".to_string(), Card::new(Club, 3).unwrap())),
             pick_player_with_starting_card(&player_decks)
         );
     }
@@ -82,14 +92,26 @@ mod tests {
     #[test]
     fn pick_player_with_starting_card_from_4_decks() {
         let player_decks = HashMap::from([
-            ("1".to_string(), HashSet::from([Card::new(Club, 10)])),
-            ("2".to_string(), HashSet::from([Card::new(Club, 11)])),
-            ("3".to_string(), HashSet::from([Card::new(Club, 2)])),
-            ("4".to_string(), HashSet::from([Card::new(Club, 3)])),
+            (
+                "1".to_string(),
+                HashSet::from([Card::new(Club, 10).unwrap()]),
+            ),
+            (
+                "2".to_string(),
+                HashSet::from([Card::new(Club, 11).unwrap()]),
+            ),
+            (
+                "3".to_string(),
+                HashSet::from([Card::new(Club, 2).unwrap()]),
+            ),
+            (
+                "4".to_string(),
+                HashSet::from([Card::new(Club, 3).unwrap()]),
+            ),
         ]);
 
         assert_eq!(
-            Some(("3".to_string(), Card::new(Club, 2))),
+            Some(("3".to_string(), Card::new(Club, 2).unwrap())),
             pick_player_with_starting_card(&player_decks)
         );
     }
@@ -97,9 +119,18 @@ mod tests {
     #[test]
     fn pick_player_with_starting_card_when_there_is_no_starting_card() {
         let player_decks = HashMap::from([
-            ("1".to_string(), HashSet::from([Card::new(Club, 10)])),
-            ("2".to_string(), HashSet::from([Card::new(Club, 11)])),
-            ("3".to_string(), HashSet::from([Card::new(Club, 4)])),
+            (
+                "1".to_string(),
+                HashSet::from([Card::new(Club, 10).unwrap()]),
+            ),
+            (
+                "2".to_string(),
+                HashSet::from([Card::new(Club, 11).unwrap()]),
+            ),
+            (
+                "3".to_string(),
+                HashSet::from([Card::new(Club, 4).unwrap()]),
+            ),
         ]);
 
         assert_eq!(None, pick_player_with_starting_card(&player_decks));
@@ -108,7 +139,10 @@ mod tests {
     #[test]
     #[should_panic(expected = "Invalid number of players")]
     fn pick_player_with_starting_card_should_panic_with_invalid_number_of_players() {
-        let player_decks = HashMap::from([("1".to_string(), HashSet::from([Card::new(Club, 10)]))]);
+        let player_decks = HashMap::from([(
+            "1".to_string(),
+            HashSet::from([Card::new(Club, 10).unwrap()]),
+        )]);
         pick_player_with_starting_card(&player_decks);
     }
 

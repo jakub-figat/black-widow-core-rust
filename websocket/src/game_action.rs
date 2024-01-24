@@ -1,9 +1,9 @@
 use crate::error::HandlerError::{ActionError, SenderError};
-use crate::error::HandlerResult;
+use crate::error::{HandlerError, HandlerResult};
 use crate::lobby::Lobby;
 use crate::network::{broadcast_game_to_players_or_break, broadcast_text, send_text};
 use crate::payload::{
-    CardExchangePayload, ClaimReadinessPayload, CreateLobbyPayload, PlaceCardPayload,
+    CardExchangePayload, ClaimReadinessPayload, CreateLobbyPayload, InputCard, PlaceCardPayload,
 };
 use crate::response::{
     get_obfuscated_game_details_json, GameListResponse, IdResponse, LobbyDetailsResponse,
@@ -11,7 +11,8 @@ use crate::response::{
 };
 use crate::WebSocketState;
 use axum::extract::ws::Message;
-use game::{CardExchange, Game, GameSettings, RoundFinished, RoundInProgress};
+use game::{Card, CardExchange, Game, GameSettings, RoundFinished, RoundInProgress};
+use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc};
 use uuid::Uuid;
@@ -40,6 +41,7 @@ pub(crate) async fn get_lobby_details(
         .ok_or(ActionError(format!("Lobby with id {} not found", &id)))?;
 
     let response = LobbyDetails(LobbyDetailsResponse {
+        id: id.clone(),
         lobby: lobby.clone(),
     });
 
@@ -57,9 +59,11 @@ pub(crate) async fn create_lobby(
     let lobby = Lobby::new_by_player(payload.max_players, payload.max_score, player)
         .map_err(ActionError)?;
     let mut lobbies = state.lobbies.lock().await;
-    lobbies.insert(Uuid::new_v4(), lobby.clone());
+    let id = Uuid::new_v4();
+    lobbies.insert(id.clone(), lobby.clone());
 
     let response = LobbyDetails(LobbyDetailsResponse {
+        id,
         lobby: lobby.clone(),
     });
     broadcast_text(&response.to_json(), broadcast_sender).map_err(SenderError)
@@ -90,6 +94,7 @@ pub(crate) async fn join_lobby(
     }
 
     let response = LobbyDetails(LobbyDetailsResponse {
+        id: id.clone(),
         lobby: lobby.clone(),
     });
     broadcast_text(&response.to_json(), broadcast_sender).map_err(SenderError)
@@ -147,6 +152,7 @@ pub(crate) async fn quit_lobby(
             LobbyDeleted(IdResponse { id: id.clone() }).to_json()
         }
         None => LobbyDetails(LobbyDetailsResponse {
+            id: id.clone(),
             lobby: lobby.clone(),
         })
         .to_json(),
@@ -207,8 +213,13 @@ pub(crate) async fn card_exchange_move(
 
     match &mut game.state {
         CardExchange(step) => {
+            let mut cards = HashSet::new();
+            for card in &payload.cards_to_exchange {
+                cards.insert(get_validated_card(card)?);
+            }
+
             let game_payload = game::CardExchangePayload {
-                cards_to_exchange: payload.cards_to_exchange.clone(),
+                cards_to_exchange: cards,
             };
 
             step.handle_payload(&game_payload, player)
@@ -249,7 +260,7 @@ pub(crate) async fn place_card_move(
     match &mut game.state {
         RoundInProgress(step) => {
             let game_payload = game::PlaceCardPayload {
-                card: payload.card.clone(),
+                card: get_validated_card(&payload.card)?.clone(),
             };
 
             step.handle_payload(&game_payload, player)
@@ -371,6 +382,10 @@ fn check_game_finished(game: &Game) -> HandlerResult {
         return Err(ActionError("Game is already finished".to_string()));
     }
     Ok(())
+}
+
+fn get_validated_card(card: &InputCard) -> Result<Card, HandlerError> {
+    Card::new(card.suit, card.value).map_err(ActionError)
 }
 
 // TODO: maybe redis for shared state if scaling instances

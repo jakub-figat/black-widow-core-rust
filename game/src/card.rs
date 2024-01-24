@@ -57,9 +57,9 @@ impl PartialOrd for Card {
 }
 
 impl Card {
-    pub fn new(suit: CardSuit, value: usize) -> Card {
+    pub fn new(suit: CardSuit, value: usize) -> Result<Card, String> {
         if value > 14 {
-            panic!("Card value cannot be greater than 14!");
+            Err("Card value cannot be greater than 14!")?
         }
 
         let score = match suit {
@@ -73,7 +73,7 @@ impl Card {
             _ => 0,
         };
 
-        Card { suit, value, score }
+        Ok(Card { suit, value, score })
     }
 }
 
@@ -90,17 +90,16 @@ mod tests {
 
     #[test]
     fn hearts_get_assigned_1_score() {
-        let heart_ace = Card::new(CardSuit::Heart, 14);
-        let heart_2 = Card::new(CardSuit::Heart, 2);
-        let spade_2 = Card::new(CardSuit::Spade, 2);
+        let heart_ace = Card::new(CardSuit::Heart, 14).unwrap();
+        let heart_2 = Card::new(CardSuit::Heart, 2).unwrap();
+        let spade_2 = Card::new(CardSuit::Spade, 2).unwrap();
         assert_eq!(heart_ace.score, 1);
         assert_eq!(heart_2.score, 1);
         assert_eq!(spade_2.score, 0);
     }
 
     #[test]
-    #[should_panic(expected = "Card value cannot be greater than 14!")]
     fn cannot_create_card_with_value_greater_than_14() {
-        Card::new(CardSuit::Spade, 15);
+        assert!(Card::new(CardSuit::Spade, 15).is_err());
     }
 }

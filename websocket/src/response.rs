@@ -49,6 +49,7 @@ pub struct LobbyListResponse {
 #[derive(Serialize, TS)]
 #[ts(export)]
 pub struct LobbyDetailsResponse {
+    pub id: Uuid,
     pub lobby: Lobby,
 }
 
@@ -98,7 +99,12 @@ impl GameDetailsResponse<CardExchangeState> {
                 &step.state.cards_to_exchange,
                 player,
             ),
-            your_exchange_cards: step.state.cards_to_exchange[player].clone(),
+            your_exchange_cards: step
+                .state
+                .cards_to_exchange
+                .get(player)
+                .unwrap_or(&HashSet::with_capacity(3))
+                .clone(),
         };
         let obfuscated_game = ObfuscatedGame::new(game, &step, state, player);
         GameDetailsResponse {

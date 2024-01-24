@@ -12,7 +12,12 @@ impl GameStep<RoundFinishedState> {
     }
 
     pub fn should_switch(&self) -> bool {
-        self.state.players_ready.len() == self.players.len()
+        self.state
+            .players_ready
+            .values()
+            .map(|&ready| ready == true)
+            .len()
+            == self.players.len()
     }
 
     pub fn game_finished(&self, max_score: usize) -> bool {
