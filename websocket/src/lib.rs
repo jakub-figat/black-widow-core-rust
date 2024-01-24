@@ -25,7 +25,7 @@ pub async fn start_game_server() {
     let app = Router::new().route("/ws", get(handle)).with_state(state);
 
     println!("Starting server on port 6379");
-    let listener = TcpListener::bind("127.0.0.1:6379").await.unwrap();
+    let listener = TcpListener::bind("0.0.0.0:6379").await.unwrap();
     axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),

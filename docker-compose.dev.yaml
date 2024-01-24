@@ -1,0 +1,17 @@
+version: "3.9"
+
+services:
+  app:
+    build:
+      context: .
+      target: builder
+    command: cargo watch -x run
+    container_name: app-dev
+    volumes:
+      - compile_artifacts:/app/target
+      - ./:/app/
+    ports:
+      - "6379:6379"
+
+volumes:
+  compile_artifacts:
