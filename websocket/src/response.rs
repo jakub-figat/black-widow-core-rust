@@ -4,7 +4,9 @@ use crate::response::WebSocketResponse::{
     GameDetailsCardExchange, GameDetailsRoundFinished, GameDetailsRoundInProgress,
 };
 use game::step::GameStep;
-use game::{self, Card, CardExchange, Game, GameSettings, RoundFinished, RoundInProgress};
+use game::{
+    self, Card, CardExchange, CardSuit, Game, GameSettings, RoundFinished, RoundInProgress,
+};
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use ts_rs::TS;
@@ -122,6 +124,8 @@ impl GameDetailsResponse<RoundInProgressState> {
         step: &GameStep<game::RoundInProgressState>,
     ) -> GameDetailsResponse<RoundInProgressState> {
         let state = RoundInProgressState {
+            current_player: step.state.current_player.clone(),
+            table_suit: step.state.table_suit,
             cards_on_table: step.state.cards_on_table.clone(),
         };
         let obfuscated_game = ObfuscatedGame::new(game, &step, state, player);
@@ -215,6 +219,10 @@ pub struct CardExchangeState {
 #[derive(Serialize, TS)]
 #[ts(export)]
 pub struct RoundInProgressState {
+    #[serde(rename = "currentPlayer")]
+    pub current_player: String,
+    #[serde(rename = "tableSuit")]
+    pub table_suit: Option<CardSuit>,
     #[serde(rename = "cardsOnTable")]
     pub cards_on_table: HashMap<String, Card>,
 }
@@ -232,8 +240,11 @@ pub struct ErrorResponse {
     pub detail: String,
 }
 
-impl WebSocketResponse {
-    pub(crate) fn to_json(&self) -> String {
+pub(crate) trait ToJson: Serialize {
+    fn to_json(&self) -> String {
         serde_json::to_string(self).unwrap()
     }
 }
+
+impl ToJson for WebSocketResponse {}
+impl ToJson for ListedGame {}

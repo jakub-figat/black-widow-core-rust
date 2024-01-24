@@ -1,5 +1,5 @@
 use crate::response::WebSocketResponse::Error;
-use crate::response::{get_obfuscated_game_details_json, ErrorResponse};
+use crate::response::{get_obfuscated_game_details_json, ErrorResponse, ToJson};
 use crate::WebSocketState;
 use axum::extract::ws::Message;
 use game::Game;

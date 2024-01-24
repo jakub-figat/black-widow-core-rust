@@ -6,8 +6,8 @@ use crate::payload::{
     CardExchangePayload, ClaimReadinessPayload, CreateLobbyPayload, InputCard, PlaceCardPayload,
 };
 use crate::response::{
-    get_obfuscated_game_details_json, GameListResponse, IdResponse, LobbyDetailsResponse,
-    LobbyListResponse, WebSocketResponse::*,
+    get_obfuscated_game_details_json, GameListResponse, IdResponse, ListedGame,
+    LobbyDetailsResponse, LobbyListResponse, ToJson, WebSocketResponse::*,
 };
 use crate::WebSocketState;
 use axum::extract::ws::Message;
@@ -88,6 +88,17 @@ pub(crate) async fn join_lobby(
             broadcast_sender,
         )
         .map_err(SenderError)?;
+
+        broadcast_text(
+            &ListedGame {
+                id: game_id.clone(),
+                players: game.players.clone(),
+            }
+            .to_json(),
+            broadcast_sender,
+        )
+        .map_err(SenderError)?;
+
         return broadcast_game_to_players_or_break(&game_id, &game, state.clone())
             .await
             .map_err(SenderError);

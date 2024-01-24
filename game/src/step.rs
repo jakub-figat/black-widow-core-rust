@@ -89,7 +89,11 @@ mod tests {
         let initial_decks = HashMap::from([
             (
                 "1".to_string(),
-                HashSet::from([Card::new(Club, 6).unwrap(), Card::new(Spade, 7).unwrap(), Card::new(Spade, 8).unwrap()]),
+                HashSet::from([
+                    Card::new(Club, 6).unwrap(),
+                    Card::new(Spade, 7).unwrap(),
+                    Card::new(Spade, 8).unwrap(),
+                ]),
             ),
             (
                 "2".to_string(),
@@ -101,7 +105,11 @@ mod tests {
             ),
             (
                 "3".to_string(),
-                HashSet::from([Card::new(Club, 3).unwrap(), Card::new(Spade, 4).unwrap(), Card::new(Spade, 5).unwrap()]),
+                HashSet::from([
+                    Card::new(Club, 3).unwrap(),
+                    Card::new(Spade, 4).unwrap(),
+                    Card::new(Spade, 5).unwrap(),
+                ]),
             ),
         ]);
 

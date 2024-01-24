@@ -144,7 +144,11 @@ mod tests {
 
     fn get_decks_of_three_cards() -> Vec<HashSet<Card>> {
         vec![
-            HashSet::from([Card::new(Spade, 2).unwrap(), Card::new(Club, 3).unwrap(), Card::new(Spade, 4).unwrap()]),
+            HashSet::from([
+                Card::new(Spade, 2).unwrap(),
+                Card::new(Club, 3).unwrap(),
+                Card::new(Spade, 4).unwrap(),
+            ]),
             HashSet::from([
                 Card::new(Spade, 5).unwrap(),
                 Card::new(Spade, 6).unwrap(),
