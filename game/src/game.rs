@@ -32,7 +32,6 @@ impl Game {
 }
 
 #[derive(Clone, Debug, Serialize, TS)]
-#[ts(export)]
 pub struct GameSettings {
     #[serde(rename = "maxScore")]
     pub max_score: usize,

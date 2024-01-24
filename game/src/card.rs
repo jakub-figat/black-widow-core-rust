@@ -4,7 +4,6 @@ use std::fmt::{Display, Formatter};
 use ts_rs::TS;
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Deserialize, Serialize, TS)]
-#[ts(export)]
 pub enum CardSuit {
     #[serde(rename = "SPADE")]
     Spade,
@@ -29,7 +28,6 @@ impl Display for CardSuit {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Deserialize, Serialize, TS)]
-#[ts(export)]
 pub struct Card {
     pub suit: CardSuit,
     pub value: usize,
