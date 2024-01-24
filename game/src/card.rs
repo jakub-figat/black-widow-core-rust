@@ -6,13 +6,13 @@ use ts_rs::TS;
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Deserialize, Serialize, TS)]
 #[ts(export)]
 pub enum CardSuit {
-    #[serde(rename = "spade")]
+    #[serde(rename = "SPADE")]
     Spade,
-    #[serde(rename = "club")]
+    #[serde(rename = "CLUB")]
     Club,
-    #[serde(rename = "heart")]
+    #[serde(rename = "HEART")]
     Heart,
-    #[serde(rename = "diamond")]
+    #[serde(rename = "DIAMOND")]
     Diamond,
 }
 
@@ -38,15 +38,7 @@ pub struct Card {
 
 impl Display for Card {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        let temp_other = self.value.to_string();
-        let value = match self.value {
-            11 => "JACK",
-            12 => "QUEEN",
-            13 => "KING",
-            14 => "ACE",
-            _ => temp_other.as_str(),
-        };
-        write!(f, "{}_{}", &self.suit, value)
+        write!(f, "{}_{}", &self.suit, self.value.to_string())
     }
 }
 

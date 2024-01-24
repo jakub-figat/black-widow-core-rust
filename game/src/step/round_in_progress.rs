@@ -210,7 +210,7 @@ mod tests {
         let mut step = get_step_from_players(&players);
         step.state.table_suit = Some(Spade);
 
-        let card = Card::new(Spade, 2);
+        let card = Card::new(Spade, 2).unwrap();
         step.player_decks
             .get_mut(&players[0])
             .unwrap()
@@ -226,10 +226,10 @@ mod tests {
         let mut step = get_step_from_players(&players);
         step.state.table_suit = Some(Spade);
 
-        let card = Card::new(Diamond, 2);
+        let card = Card::new(Diamond, 2).unwrap();
         let player_deck = step.player_decks.get_mut(&players[0]).unwrap();
         player_deck.insert(card.clone());
-        player_deck.insert(Card::new(Spade, 2));
+        player_deck.insert(Card::new(Spade, 2).unwrap());
 
         let payload = PlaceCardPayload { card };
 
@@ -245,7 +245,7 @@ mod tests {
         let mut step = get_step_from_players(&players);
         step.state.table_suit = Some(Spade);
 
-        let card = Card::new(Diamond, 2);
+        let card = Card::new(Diamond, 2).unwrap();
         step.player_decks
             .get_mut(&players[0])
             .unwrap()
@@ -263,8 +263,8 @@ mod tests {
         step.player_decks
             .get_mut(&players[0])
             .unwrap()
-            .insert(Card::new(Spade, 2));
-        let card = Card::new(Heart, 2);
+            .insert(Card::new(Spade, 2).unwrap());
+        let card = Card::new(Heart, 2).unwrap();
 
         step.player_decks
             .get_mut(&players[0])
@@ -284,7 +284,7 @@ mod tests {
         let players = get_players();
         let mut step = get_step_from_players(&players);
 
-        let card = Card::new(Heart, 2);
+        let card = Card::new(Heart, 2).unwrap();
         step.player_decks
             .get_mut(&players[0])
             .unwrap()
@@ -299,7 +299,7 @@ mod tests {
         let players = get_players();
         let mut step = get_step_from_players(&players);
 
-        let card = Card::new(Spade, 2);
+        let card = Card::new(Spade, 2).unwrap();
         step.player_decks
             .get_mut(&players[0])
             .unwrap()
@@ -314,9 +314,9 @@ mod tests {
         let players = get_players();
         let mut step = get_step_from_players(&players);
         let (card_1, card_2, card_3) = (
-            Card::new(Spade, 5),
-            Card::new(Spade, 12),
-            Card::new(Spade, 4),
+            Card::new(Spade, 5).unwrap(),
+            Card::new(Spade, 12).unwrap(),
+            Card::new(Spade, 4).unwrap(),
         );
         step.player_decks = HashMap::from([
             ("1".to_string(), HashSet::from([card_1.clone()])),

@@ -58,7 +58,7 @@ mod tests {
     fn player_does_not_have_a_card_when_player_does_not_have_a_card() {
         let players = get_players();
         let step = GameStep::empty_from_players(&players);
-        let card = Card::new(Spade, 2);
+        let card = Card::new(Spade, 2).unwrap();
 
         assert_eq!(
             step.validate_player_has_card(&card, &players[0]),
@@ -72,7 +72,7 @@ mod tests {
     fn player_does_not_have_a_card_when_player_has_a_card() {
         let players = get_players();
         let mut step = GameStep::empty_from_players(&players);
-        let card = Card::new(Spade, 2);
+        let card = Card::new(Spade, 2).unwrap();
 
         step.player_decks
             .get_mut(&players[0])
@@ -89,19 +89,19 @@ mod tests {
         let initial_decks = HashMap::from([
             (
                 "1".to_string(),
-                HashSet::from([Card::new(Club, 6), Card::new(Spade, 7), Card::new(Spade, 8)]),
+                HashSet::from([Card::new(Club, 6).unwrap(), Card::new(Spade, 7).unwrap(), Card::new(Spade, 8).unwrap()]),
             ),
             (
                 "2".to_string(),
                 HashSet::from([
-                    Card::new(Club, 9),
-                    Card::new(Spade, 10),
-                    Card::new(Spade, 12),
+                    Card::new(Club, 9).unwrap(),
+                    Card::new(Spade, 10).unwrap(),
+                    Card::new(Spade, 12).unwrap(),
                 ]),
             ),
             (
                 "3".to_string(),
-                HashSet::from([Card::new(Club, 3), Card::new(Spade, 4), Card::new(Spade, 5)]),
+                HashSet::from([Card::new(Club, 3).unwrap(), Card::new(Spade, 4).unwrap(), Card::new(Spade, 5).unwrap()]),
             ),
         ]);
 
@@ -127,7 +127,7 @@ mod tests {
         let mut round_in_progress_step = exchange_step.to_round_in_progress();
 
         let payload = PlaceCardPayload {
-            card: Card::new(Club, 6),
+            card: Card::new(Club, 6).unwrap(),
         };
         round_in_progress_step
             .validate_payload(&payload, "2")
@@ -135,7 +135,7 @@ mod tests {
         round_in_progress_step.dispatch_payload(&payload, "2");
 
         let payload = PlaceCardPayload {
-            card: Card::new(Club, 9),
+            card: Card::new(Club, 9).unwrap(),
         };
         round_in_progress_step
             .validate_payload(&payload, "3")
@@ -150,7 +150,7 @@ mod tests {
         //     3: [spade_10, spade_12], <- turn
         // ]
         let payload = PlaceCardPayload {
-            card: Card::new(Spade, 12),
+            card: Card::new(Spade, 12).unwrap(),
         };
         round_in_progress_step
             .validate_payload(&payload, "3")
@@ -158,7 +158,7 @@ mod tests {
         round_in_progress_step.dispatch_payload(&payload, "3");
 
         let payload = PlaceCardPayload {
-            card: Card::new(Spade, 4),
+            card: Card::new(Spade, 4).unwrap(),
         };
         round_in_progress_step
             .validate_payload(&payload, "1")
@@ -166,7 +166,7 @@ mod tests {
         round_in_progress_step.dispatch_payload(&payload, "1");
 
         let payload = PlaceCardPayload {
-            card: Card::new(Spade, 7),
+            card: Card::new(Spade, 7).unwrap(),
         };
         round_in_progress_step
             .validate_payload(&payload, "2")
@@ -183,7 +183,7 @@ mod tests {
         //     3: [spade_10], <- turn
         // ]
         let payload = PlaceCardPayload {
-            card: Card::new(Spade, 10),
+            card: Card::new(Spade, 10).unwrap(),
         };
         round_in_progress_step
             .validate_payload(&payload, "3")
@@ -191,7 +191,7 @@ mod tests {
         round_in_progress_step.dispatch_payload(&payload, "3");
 
         let payload = PlaceCardPayload {
-            card: Card::new(Spade, 5),
+            card: Card::new(Spade, 5).unwrap(),
         };
         round_in_progress_step
             .validate_payload(&payload, "1")
@@ -199,7 +199,7 @@ mod tests {
         round_in_progress_step.dispatch_payload(&payload, "1");
 
         let payload = PlaceCardPayload {
-            card: Card::new(Spade, 8),
+            card: Card::new(Spade, 8).unwrap(),
         };
         round_in_progress_step
             .validate_payload(&payload, "2")

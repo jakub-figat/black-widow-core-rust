@@ -144,16 +144,16 @@ mod tests {
 
     fn get_decks_of_three_cards() -> Vec<HashSet<Card>> {
         vec![
-            HashSet::from([Card::new(Spade, 2), Card::new(Club, 3), Card::new(Spade, 4)]),
+            HashSet::from([Card::new(Spade, 2).unwrap(), Card::new(Club, 3).unwrap(), Card::new(Spade, 4).unwrap()]),
             HashSet::from([
-                Card::new(Spade, 5),
-                Card::new(Spade, 6),
-                Card::new(Spade, 7),
+                Card::new(Spade, 5).unwrap(),
+                Card::new(Spade, 6).unwrap(),
+                Card::new(Spade, 7).unwrap(),
             ]),
             HashSet::from([
-                Card::new(Spade, 8),
-                Card::new(Spade, 9),
-                Card::new(Spade, 10),
+                Card::new(Spade, 8).unwrap(),
+                Card::new(Spade, 9).unwrap(),
+                Card::new(Spade, 10).unwrap(),
             ]),
         ]
     }
@@ -175,10 +175,10 @@ mod tests {
         let players = get_players();
         let step = GameStep::empty_from_players(&players);
         let cards = HashSet::from([
-            Card::new(Spade, 2),
-            Card::new(Spade, 3),
-            Card::new(Spade, 4),
-            Card::new(Spade, 5),
+            Card::new(Spade, 2).unwrap(),
+            Card::new(Spade, 3).unwrap(),
+            Card::new(Spade, 4).unwrap(),
+            Card::new(Spade, 5).unwrap(),
         ]);
 
         let payload = CardExchangePayload {
@@ -197,9 +197,9 @@ mod tests {
         let players = get_players();
         let mut step = GameStep::empty_from_players(&players);
         let cards = HashSet::from([
-            Card::new(Spade, 2),
-            Card::new(Spade, 3),
-            Card::new(Spade, 4),
+            Card::new(Spade, 2).unwrap(),
+            Card::new(Spade, 3).unwrap(),
+            Card::new(Spade, 4).unwrap(),
         ]);
 
         step.state
@@ -221,9 +221,9 @@ mod tests {
     fn player_1_dispatch_payload() {
         let players = get_players();
         let cards = HashSet::from([
-            Card::new(Spade, 2),
-            Card::new(Spade, 3),
-            Card::new(Spade, 4),
+            Card::new(Spade, 2).unwrap(),
+            Card::new(Spade, 3).unwrap(),
+            Card::new(Spade, 4).unwrap(),
         ]);
         let payload = CardExchangePayload {
             cards_to_exchange: cards.clone(),
