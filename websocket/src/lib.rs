@@ -18,15 +18,26 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
+use tracing_subscriber::{Layer, filter};
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 use uuid::Uuid;
 
 pub async fn start_game_server() {
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer().with_filter(filter::LevelFilter::INFO))
+        .init();
+
     let port = std::env::var("PORT").unwrap_or("6379".to_string());
     let state = Arc::new(WebSocketState::new());
-    let app = Router::new().route("/ws", get(handle)).with_state(state);
+    let app = Router::new()
+        .route("/ws", get(handle))
+        .with_state(state);
 
-    println!("Starting server on port {}", port);
-    let listener = TcpListener::bind(format!("0.0.0.0:{}", port)).await.unwrap();
+    tracing::info!("Starting server on port {}", port);
+    let listener = TcpListener::bind(format!("0.0.0.0:{}", port))
+        .await
+        .unwrap();
     axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),

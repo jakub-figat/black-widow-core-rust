@@ -8,12 +8,12 @@ use crate::payload::{WebSocketPayload, WebSocketPayload::*};
 use crate::WebSocketState;
 use axum::extract::ws::{Message, WebSocket};
 use axum::extract::{State, WebSocketUpgrade};
+use axum::http::{HeaderMap, HeaderValue};
 use axum::response::IntoResponse;
 use futures::stream::{SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
 use std::ops::ControlFlow;
 use std::sync::Arc;
-use axum::http::{HeaderMap, HeaderValue};
 use tokio::sync::{broadcast, mpsc};
 
 pub(crate) async fn handle(
@@ -21,7 +21,6 @@ pub(crate) async fn handle(
     websocket: WebSocketUpgrade,
     State(state): State<Arc<WebSocketState>>,
 ) -> impl IntoResponse {
-
     websocket.on_upgrade(move |socket| handle_websocket(socket, headers.clone(), state))
 }
 
@@ -30,7 +29,6 @@ pub(crate) async fn handle_websocket(
     headers: HeaderMap,
     state: Arc<WebSocketState>,
 ) {
-
     let (sink, stream) = websocket.split();
     let (mut sender, receiver) = mpsc::channel(128);
     tokio::spawn(wrap_sink(sink, receiver));
@@ -43,8 +41,7 @@ pub(crate) async fn handle_websocket(
 
     let user = user_result.unwrap();
 
-    if let Err(text) = add_player_to_connections(&user, sender.clone(), state.clone()).await
-    {
+    if let Err(text) = add_player_to_connections(&user, sender.clone(), state.clone()).await {
         let _ = send_error(&text, &mut sender).await;
         return;
     }
@@ -64,10 +61,11 @@ pub(crate) async fn handle_websocket(
     player_connections.remove(&user);
 }
 
-
 fn get_user_from_header(user_header: Option<&HeaderValue>) -> Result<String, String> {
     let user_header = user_header.ok_or("X-User header not supplied".to_string())?;
-    let user_result = user_header.to_str().map_err(|_| "Could not parse X-User header".to_string())?;
+    let user_result = user_header
+        .to_str()
+        .map_err(|_| "Could not parse X-User header".to_string())?;
     Ok(user_result.to_string())
 }
 
