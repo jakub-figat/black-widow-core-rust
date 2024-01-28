@@ -16,6 +16,6 @@ Rewritten to Rust from [python version](https://github.com/jakub-figat/black-wid
 ## Usage
 
 All communication is WebSocket based, as of now game requires providing
-`X-User` header for authentication. 
+`user` cookie for authentication. 
 
 Payload and response schemas can be found in `/bindings` dir.
