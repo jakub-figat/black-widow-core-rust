@@ -8,8 +8,9 @@ use crate::payload::{WebSocketPayload, WebSocketPayload::*};
 use crate::WebSocketState;
 use axum::extract::ws::{Message, WebSocket};
 use axum::extract::{State, WebSocketUpgrade};
-use axum::http::{HeaderMap, HeaderValue};
 use axum::response::IntoResponse;
+use axum_extra::extract::cookie::Cookie;
+use axum_extra::extract::CookieJar;
 use futures::stream::{SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
 use std::ops::ControlFlow;
@@ -17,23 +18,23 @@ use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc};
 
 pub(crate) async fn handle(
-    headers: HeaderMap,
+    cookies: CookieJar,
     websocket: WebSocketUpgrade,
     State(state): State<Arc<WebSocketState>>,
 ) -> impl IntoResponse {
-    websocket.on_upgrade(move |socket| handle_websocket(socket, headers.clone(), state))
+    websocket.on_upgrade(move |socket| handle_websocket(socket, cookies.clone(), state))
 }
 
 pub(crate) async fn handle_websocket(
     websocket: WebSocket,
-    headers: HeaderMap,
+    cookies: CookieJar,
     state: Arc<WebSocketState>,
 ) {
     let (sink, stream) = websocket.split();
     let (mut sender, receiver) = mpsc::channel(128);
     tokio::spawn(wrap_sink(sink, receiver));
 
-    let user_result = get_user_from_header(headers.get("X-User"));
+    let user_result = get_user_from_header(cookies.get("user"));
     if let Err(text) = user_result {
         let _ = send_error(&text, &mut sender).await;
         return;
@@ -61,12 +62,9 @@ pub(crate) async fn handle_websocket(
     player_connections.remove(&user);
 }
 
-fn get_user_from_header(user_header: Option<&HeaderValue>) -> Result<String, String> {
-    let user_header = user_header.ok_or("X-User header not supplied".to_string())?;
-    let user_result = user_header
-        .to_str()
-        .map_err(|_| "Could not parse X-User header".to_string())?;
-    Ok(user_result.to_string())
+fn get_user_from_header(user_cookie: Option<&Cookie>) -> Result<String, String> {
+    let user_cookie = user_cookie.ok_or("user cookie not supplied".to_string())?;
+    Ok(user_cookie.to_string())
 }
 
 async fn add_player_to_connections(

@@ -18,9 +18,9 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
-use tracing_subscriber::{Layer, filter};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::{filter, Layer};
 use uuid::Uuid;
 
 pub async fn start_game_server() {
@@ -30,9 +30,7 @@ pub async fn start_game_server() {
 
     let port = std::env::var("PORT").unwrap_or("6379".to_string());
     let state = Arc::new(WebSocketState::new());
-    let app = Router::new()
-        .route("/ws", get(handle))
-        .with_state(state);
+    let app = Router::new().route("/ws", get(handle)).with_state(state);
 
     tracing::info!("Starting server on port {}", port);
     let listener = TcpListener::bind(format!("0.0.0.0:{}", port))
