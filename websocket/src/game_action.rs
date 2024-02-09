@@ -71,7 +71,7 @@ pub(crate) async fn create_lobby(
 
 pub(crate) async fn join_lobby(
     id: &Uuid,
-    player: &str,
+    player: &String,
     broadcast_sender: &mut BroadcastSender,
     state: Arc<WebSocketState>,
 ) -> HandlerResult {
@@ -79,6 +79,13 @@ pub(crate) async fn join_lobby(
     let lobby = lobbies
         .get_mut(id)
         .ok_or(ActionError(format!("Lobby with id {} not found", &id)))?;
+
+    if lobby.players.contains(player) {
+        return Err(ActionError(format!(
+            "You already belong to lobby with id {}",
+            id
+        )));
+    }
 
     if let Some((game_id, game)) = add_player_to_lobby(lobby, player, state.clone()).await {
         lobbies.remove(id);
