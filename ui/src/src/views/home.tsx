@@ -1,10 +1,116 @@
-import { Layout } from "../components/layout";
+import { Box, Button, Typography } from "@mui/material";
+import { useAppDispatch, useAppSelector } from "../store/hooks";
+import { getGames, getLobbies } from "../store/game";
+import { useEffect, useRef } from "react";
+import { getIsConnected, getIsConnecting } from "../store/websocket";
+import { connect, disconnect } from "../store/websocket/effects";
+import { WEB_SOCKET_URL } from "../config/consts";
+import { constructSxStyles } from "../utils/construct-sx-styles";
+import { getUsername } from "../store/auth";
+import { logout } from "../store/auth/effect";
 
 const HomeView = () => {
+  const dispatch = useAppDispatch();
+
+  const styles = constructSxStyles({
+    lobbyContainer: {
+      maxWidth: "500px",
+      display: "flex",
+      flexDirection: "column",
+      mt: 4,
+    },
+    gameContainer: {
+      maxWidth: "500px",
+      display: "flex",
+      flexDirection: "column",
+      mt: 1,
+    },
+  });
+
+  const isMounted = useRef(false);
+
+  const username = useAppSelector(getUsername);
+
+  const isConnected = useAppSelector(getIsConnected);
+  const isTryingToConnect = useAppSelector(getIsConnecting);
+
+  const lobbies = useAppSelector(getLobbies);
+  const games = useAppSelector(getGames);
+
+  useEffect(() => {
+    if (isMounted.current) return;
+
+    if (!isConnected && !isTryingToConnect) {
+      dispatch(connect(WEB_SOCKET_URL));
+      isMounted.current = true;
+    }
+
+    return () => {
+      if (isConnected || isTryingToConnect) {
+        dispatch(disconnect());
+        isMounted.current = false;
+      }
+    };
+  }, []);
+
+  const renderLobbies = () => {
+    if (!lobbies) return null;
+
+    return lobbies.map((lobby) => (
+      <Box key={lobby.id} sx={styles.lobbyContainer}>
+        <Typography fontWeight={"bold"}>{lobby.id}</Typography>
+        <Typography>
+          Players: {lobby.players.length}/{lobby.players.length}
+        </Typography>
+        <Typography>MaxScore: {lobby.maxScore}</Typography>
+        <Button
+          variant="contained"
+          size="small"
+          sx={{
+            maxWidth: "150px",
+          }}
+        >
+          Join lobby
+        </Button>
+      </Box>
+    ));
+  };
+
+  const renderGames = () => {
+    if (!games) return null;
+
+    return (
+      <Box mt={4}>
+        <Typography fontWeight={"bold"}>Ongoing games:</Typography>
+        {games.map((game) => (
+          <Box key={game.id} sx={styles.gameContainer}>
+            <Typography fontWeight={"bold"}>{game.id}</Typography>
+            <Typography>Players: {game.players.length}</Typography>
+          </Box>
+        ))}
+      </Box>
+    );
+  };
+
   return (
-    <Layout>
-      <h1>Home</h1>
-    </Layout>
+    <Box>
+      <Typography>Welcome back {username}!</Typography>
+      <Button
+        variant="contained"
+        size="small"
+        sx={{
+          maxWidth: "150px",
+          my: 1,
+        }}
+        onClick={() => {
+          dispatch(logout());
+        }}
+      >
+        Logout
+      </Button>
+      {renderLobbies()}
+      {renderGames()}
+    </Box>
   );
 };
 
