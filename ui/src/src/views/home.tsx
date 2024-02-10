@@ -6,8 +6,7 @@ import { getIsConnected, getIsConnecting } from "../store/websocket";
 import { connect, disconnect } from "../store/websocket/effects";
 import { WEB_SOCKET_URL } from "../config/consts";
 import { constructSxStyles } from "../utils/construct-sx-styles";
-import { getUsername } from "../store/auth";
-import { logout } from "../store/auth/effect";
+import { Layout } from "../components/layout";
 
 const HomeView = () => {
   const dispatch = useAppDispatch();
@@ -28,8 +27,6 @@ const HomeView = () => {
   });
 
   const isMounted = useRef(false);
-
-  const username = useAppSelector(getUsername);
 
   const isConnected = useAppSelector(getIsConnected);
   const isTryingToConnect = useAppSelector(getIsConnecting);
@@ -60,7 +57,7 @@ const HomeView = () => {
       <Box key={lobby.id} sx={styles.lobbyContainer}>
         <Typography fontWeight={"bold"}>{lobby.id}</Typography>
         <Typography>
-          Players: {lobby.players.length}/{lobby.players.length}
+          Players: {lobby.players.length}/{lobby.maxPlayers}
         </Typography>
         <Typography>MaxScore: {lobby.maxScore}</Typography>
         <Button
@@ -93,24 +90,10 @@ const HomeView = () => {
   };
 
   return (
-    <Box>
-      <Typography>Welcome back {username}!</Typography>
-      <Button
-        variant="contained"
-        size="small"
-        sx={{
-          maxWidth: "150px",
-          my: 1,
-        }}
-        onClick={() => {
-          dispatch(logout());
-        }}
-      >
-        Logout
-      </Button>
+    <Layout>
       {renderLobbies()}
       {renderGames()}
-    </Box>
+    </Layout>
   );
 };
 

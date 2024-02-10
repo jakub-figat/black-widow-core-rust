@@ -7,7 +7,6 @@ interface AuthState {
 }
 
 const currentUser = getCookie("user");
-console.log("CURRENT USER", currentUser);
 
 const initialState: AuthState = {
   username: currentUser || null,
