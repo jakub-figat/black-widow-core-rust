@@ -1,5 +1,6 @@
 use crate::card::Card;
 use crate::card::CardSuit::{Club, Diamond, Heart, Spade};
+use crate::CardSuit;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 use std::collections::{HashMap, HashSet};
@@ -60,6 +61,14 @@ pub fn get_starting_player_decks(players: &[String]) -> HashMap<String, HashSet<
     }
 
     player_decks
+}
+
+pub fn check_if_player_has_only_one_suit_remaining(cards: &HashSet<Card>, suit: CardSuit) -> bool {
+    cards.iter().all(|card| card.suit == suit)
+}
+
+pub fn check_if_player_has_suit(cards: &HashSet<Card>, suit: CardSuit) -> bool {
+    cards.iter().any(|card| card.suit == suit)
 }
 
 #[cfg(test)]

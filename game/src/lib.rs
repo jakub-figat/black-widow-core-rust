@@ -1,7 +1,7 @@
 mod card;
 mod error;
 pub mod game;
-mod helper;
+pub mod helper;
 mod payload;
 pub mod step;
 

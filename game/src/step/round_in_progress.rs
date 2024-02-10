@@ -1,6 +1,7 @@
 use crate::card::CardSuit::Heart;
 use crate::card::{Card, CardSuit};
 use crate::error::{GameError, GameResult};
+use crate::helper::{check_if_player_has_only_one_suit_remaining, check_if_player_has_suit};
 use crate::payload::PlaceCardPayload;
 use crate::step::round_finished::RoundFinishedState;
 use crate::step::GameStep;
@@ -24,7 +25,8 @@ impl GameStep<RoundInProgressState> {
         table_suit: CardSuit,
         player: &str,
     ) -> GameResult<()> {
-        if placed_suit != table_suit && self.check_if_player_has_suit(player, table_suit) {
+        let cards = &self.player_decks[player];
+        if placed_suit != table_suit && check_if_player_has_suit(cards, table_suit) {
             Err(GameError(format!(
                 "Player {} tried to place {}, despite having {} in deck",
                 &player, placed_suit, table_suit
@@ -35,7 +37,8 @@ impl GameStep<RoundInProgressState> {
     }
 
     fn validate_only_heart_left(&self, player: &str) -> GameResult<()> {
-        if !self.check_if_player_has_only_one_suit_remaining(player, Heart) {
+        let cards = &self.player_decks[player];
+        if !check_if_player_has_only_one_suit_remaining(cards, Heart) {
             Err(GameError(format!(
                 "Player {} tried to place Heart suit on the table, despite having other suits left",
                 player

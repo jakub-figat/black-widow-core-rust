@@ -1,4 +1,4 @@
-use crate::card::{Card, CardSuit};
+use crate::card::Card;
 use crate::error::{GameError, GameResult};
 use std::collections::{HashMap, HashSet};
 
@@ -25,22 +25,6 @@ impl<S> GameStep<S> {
         }
 
         Ok(())
-    }
-
-    fn check_if_player_has_only_one_suit_remaining(&self, player: &str, suit: CardSuit) -> bool {
-        self.player_decks
-            .get(player)
-            .unwrap()
-            .iter()
-            .all(|card| card.suit == suit)
-    }
-
-    fn check_if_player_has_suit(&self, player: &str, suit: CardSuit) -> bool {
-        self.player_decks
-            .get(player)
-            .unwrap()
-            .iter()
-            .any(|card| card.suit == suit)
     }
 }
 

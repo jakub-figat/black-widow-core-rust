@@ -1357,6 +1357,7 @@ dependencies = [
  "axum-extra",
  "futures",
  "game",
+ "rand",
  "serde",
  "serde_json",
  "tokio",

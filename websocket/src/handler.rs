@@ -132,7 +132,7 @@ pub(crate) async fn handle_message(
             match handle_text_message(text, player, sender, &mut broadcast_sender, state).await {
                 Ok(_) => ControlFlow::Continue(()),
                 Err(text) => {
-                    println!("{}", text);
+                    tracing::error!(text);
                     ControlFlow::Break(())
                 }
             }
@@ -144,7 +144,7 @@ pub(crate) async fn handle_message(
         {
             Ok(_) => ControlFlow::Continue(()),
             Err(error) => {
-                println!("{}", error.to_string());
+                tracing::error!("{}", error.to_string());
                 ControlFlow::Break(())
             }
         },

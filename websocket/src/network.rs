@@ -7,10 +7,10 @@ use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc};
 use uuid::Uuid;
 
-pub(crate) async fn send_text(
-    text: &str,
-    sender: &mut mpsc::Sender<Message>,
-) -> Result<(), String> {
+pub(crate) type Sender = mpsc::Sender<Message>;
+pub(crate) type BroadcastSender = broadcast::Sender<Message>;
+
+pub(crate) async fn send_text(text: &str, sender: &mut Sender) -> Result<(), String> {
     sender
         .send(Message::Text(text.to_string()))
         .await
@@ -19,7 +19,7 @@ pub(crate) async fn send_text(
 
 pub(crate) fn broadcast_text(
     text: &str,
-    broadcast_sender: &mut broadcast::Sender<Message>,
+    broadcast_sender: &mut BroadcastSender,
 ) -> Result<(), String> {
     broadcast_sender
         .send(Message::Text(text.to_string()))
@@ -27,7 +27,7 @@ pub(crate) fn broadcast_text(
         .map_err(|e| e.to_string())
 }
 
-pub(crate) async fn broadcast_game_to_players_or_break(
+pub(crate) async fn broadcast_game_to_players(
     id: &Uuid,
     game: &Game,
     state: Arc<WebSocketState>,
@@ -52,10 +52,7 @@ pub(crate) async fn broadcast_game_to_players_or_break(
     Ok(())
 }
 
-pub(crate) async fn send_error(
-    text: &str,
-    sender: &mut mpsc::Sender<Message>,
-) -> Result<(), String> {
+pub(crate) async fn send_error(text: &str, sender: &mut Sender) -> Result<(), String> {
     send_text(
         &Error(ErrorResponse {
             detail: text.to_string(),

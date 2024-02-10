@@ -1,7 +1,9 @@
 use crate::error::HandlerError::{ActionError, SenderError};
 use crate::error::{HandlerError, HandlerResult};
 use crate::lobby::Lobby;
-use crate::network::{broadcast_game_to_players_or_break, broadcast_text, send_text};
+use crate::network::{
+    broadcast_game_to_players, broadcast_text, send_text, BroadcastSender, Sender,
+};
 use crate::payload::{
     CardExchangePayload, ClaimReadinessPayload, CreateLobbyPayload, InputCard, PlaceCardPayload,
 };
@@ -9,16 +11,12 @@ use crate::response::{
     get_obfuscated_game_details_json, GameListResponse, IdResponse, ListedGame,
     LobbyDetailsResponse, LobbyListResponse, ToJson, WebSocketResponse::*,
 };
+use crate::timeout::{cancel_lobby_timeout, schedule_delete_lobby};
 use crate::WebSocketState;
-use axum::extract::ws::Message;
 use game::{Card, CardExchange, Game, GameSettings, RoundFinished, RoundInProgress};
 use std::collections::HashSet;
 use std::sync::Arc;
-use tokio::sync::{broadcast, mpsc};
 use uuid::Uuid;
-
-type Sender = mpsc::Sender<Message>;
-type BroadcastSender = broadcast::Sender<Message>;
 
 pub(crate) async fn list_lobbies(sender: &mut Sender, state: Arc<WebSocketState>) -> HandlerResult {
     let lobbies = state.lobbies.lock().await;
@@ -60,7 +58,18 @@ pub(crate) async fn create_lobby(
         .map_err(ActionError)?;
     let mut lobbies = state.lobbies.lock().await;
     let id = Uuid::new_v4();
+
     lobbies.insert(id.clone(), lobby.clone());
+
+    let timeout_handle = tokio::spawn(schedule_delete_lobby(
+        id.clone(),
+        broadcast_sender.clone(),
+        state.clone(),
+    ));
+    {
+        let mut lobby_timeouts = state.lobby_timeouts.lock().unwrap();
+        lobby_timeouts.insert(id.clone(), timeout_handle);
+    }
 
     let response = LobbyDetails(LobbyDetailsResponse {
         id,
@@ -89,6 +98,7 @@ pub(crate) async fn join_lobby(
 
     if let Some((game_id, game)) = add_player_to_lobby(lobby, player, state.clone()).await {
         lobbies.remove(id);
+        cancel_lobby_timeout(&id, state.clone());
 
         broadcast_text(
             &LobbyDeleted(IdResponse { id: id.clone() }).to_json(),
@@ -106,7 +116,7 @@ pub(crate) async fn join_lobby(
         )
         .map_err(SenderError)?;
 
-        return broadcast_game_to_players_or_break(&game_id, &game, state.clone())
+        return broadcast_game_to_players(&game_id, &game, state.clone())
             .await
             .map_err(SenderError);
     }
@@ -167,6 +177,7 @@ pub(crate) async fn quit_lobby(
     let response = match remove_player_from_lobby(player, &mut lobby).await {
         Some(_) => {
             lobbies.remove(id);
+            cancel_lobby_timeout(&id, state.clone());
             LobbyDeleted(IdResponse { id: id.clone() }).to_json()
         }
         None => LobbyDetails(LobbyDetailsResponse {
@@ -243,17 +254,12 @@ pub(crate) async fn card_exchange_move(
             step.handle_payload(&game_payload, player)
                 .map_err(|e| ActionError(e.to_string()))?;
 
-            match step.should_switch() {
-                true => {
-                    game.state = RoundInProgress(step.clone().to_round_in_progress());
-                    broadcast_game_to_players_or_break(&payload.id, &game, state.clone())
-                        .await
-                        .map_err(SenderError)
-                }
-                false => broadcast_game_to_players_or_break(&payload.id, &game, state.clone())
-                    .await
-                    .map_err(SenderError),
+            if step.should_switch() {
+                game.state = RoundInProgress(step.clone().to_round_in_progress());
             }
+            broadcast_game_to_players(&payload.id, &game, state.clone())
+                .await
+                .map_err(SenderError)
         }
         _ => Err(ActionError(
             "Invalid game action, expected CardExchangeMove".to_string(),
@@ -284,17 +290,12 @@ pub(crate) async fn place_card_move(
             step.handle_payload(&game_payload, player)
                 .map_err(|e| ActionError(e.to_string()))?;
 
-            match step.should_switch() {
-                true => {
-                    game.state = RoundFinished(step.clone().to_round_finished());
-                    broadcast_game_to_players_or_break(&payload.id, &game, state.clone())
-                        .await
-                        .map_err(SenderError)
-                }
-                false => broadcast_game_to_players_or_break(&payload.id, &game, state.clone())
-                    .await
-                    .map_err(SenderError),
+            if step.should_switch() {
+                game.state = RoundFinished(step.clone().to_round_finished());
             }
+            broadcast_game_to_players(&payload.id, &game, state.clone())
+                .await
+                .map_err(SenderError)
         }
         _ => Err(ActionError(
             "Invalid game action, expected RoundInProgress".to_string(),
@@ -324,17 +325,12 @@ pub(crate) async fn claim_readiness_move(
 
             step.handle_payload(&game_payload, player);
 
-            match step.should_switch() {
-                true => {
-                    game.state = CardExchange(step.clone().to_card_exchange());
-                    broadcast_game_to_players_or_break(&payload.id, &game, state.clone())
-                        .await
-                        .map_err(SenderError)
-                }
-                false => broadcast_game_to_players_or_break(&payload.id, &game, state.clone())
-                    .await
-                    .map_err(SenderError),
+            if step.should_switch() {
+                game.state = CardExchange(step.clone().to_card_exchange());
             }
+            broadcast_game_to_players(&payload.id, &game, state.clone())
+                .await
+                .map_err(SenderError)
         }
         _ => Err(ActionError(
             "Invalid game action, expected RoundFinished".to_string(),
@@ -368,7 +364,7 @@ pub(crate) async fn quit_game(
             let response = GameDeleted(IdResponse { id: id.clone() }).to_json();
             broadcast_text(&response, broadcast_sender).map_err(SenderError)
         }
-        None => broadcast_game_to_players_or_break(id, &game, state.clone())
+        None => broadcast_game_to_players(id, &game, state.clone())
             .await
             .map_err(SenderError),
     }
