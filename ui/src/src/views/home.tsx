@@ -1,12 +1,19 @@
 import { Box, Button, Typography } from "@mui/material";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
-import { getGames, getLobbies } from "../store/game";
+import {
+  getCurrentGame,
+  getGames,
+  getLobbies,
+  getMyGames,
+  getMyLobbies,
+} from "../store/game";
 import { useEffect, useRef } from "react";
 import { getIsConnected, getIsConnecting } from "../store/websocket";
-import { connect, disconnect } from "../store/websocket/effects";
+import { connect, disconnect, send } from "../store/websocket/effects";
 import { WEB_SOCKET_URL } from "../config/consts";
 import { constructSxStyles } from "../utils/construct-sx-styles";
 import { Layout } from "../components/layout";
+import { GameLayout } from "../components/game-layout";
 
 const HomeView = () => {
   const dispatch = useAppDispatch();
@@ -16,13 +23,13 @@ const HomeView = () => {
       maxWidth: "500px",
       display: "flex",
       flexDirection: "column",
-      mt: 4,
+      mt: 8,
     },
     gameContainer: {
       maxWidth: "500px",
       display: "flex",
       flexDirection: "column",
-      mt: 1,
+      mt: 8,
     },
   });
 
@@ -33,6 +40,10 @@ const HomeView = () => {
 
   const lobbies = useAppSelector(getLobbies);
   const games = useAppSelector(getGames);
+  const myLobbies = useAppSelector(getMyLobbies);
+  const myGames = useAppSelector(getMyGames);
+
+  const currentGameState = useAppSelector(getCurrentGame);
 
   useEffect(() => {
     if (isMounted.current) return;
@@ -50,27 +61,83 @@ const HomeView = () => {
     };
   }, []);
 
+  const handleJoinLobby = (lobbyId: string) => {
+    dispatch(
+      send({
+        action: "joinLobby",
+        id: lobbyId,
+      })
+    );
+  };
+
+  const handleQuitLobby = (lobbyId: string) => {
+    dispatch(
+      send({
+        action: "quitLobby",
+        id: lobbyId,
+      })
+    );
+  };
+
+  const handleRejoinGame = (gameId: string) => {
+    dispatch(
+      send({
+        action: "getGameDetails",
+        id: gameId,
+      })
+    );
+  };
+
   const renderLobbies = () => {
     if (!lobbies) return null;
 
-    return lobbies.map((lobby) => (
-      <Box key={lobby.id} sx={styles.lobbyContainer}>
-        <Typography fontWeight={"bold"}>{lobby.id}</Typography>
-        <Typography>
-          Players: {lobby.players.length}/{lobby.maxPlayers}
-        </Typography>
-        <Typography>MaxScore: {lobby.maxScore}</Typography>
-        <Button
-          variant="contained"
-          size="small"
-          sx={{
-            maxWidth: "150px",
-          }}
-        >
-          Join lobby
-        </Button>
-      </Box>
-    ));
+    return lobbies.map((lobby) => {
+      const alreadyInLobby = myLobbies?.find(
+        (myLobby) => myLobby.id === lobby.id
+      );
+
+      if (alreadyInLobby) {
+        return (
+          <Box key={lobby.id} sx={styles.lobbyContainer}>
+            <Typography fontWeight={"bold"}>{lobby.id}</Typography>
+            <Typography>
+              Players: {lobby.players.length}/{lobby.maxPlayers}
+            </Typography>
+            <Typography>MaxScore: {lobby.maxScore}</Typography>
+            <Button
+              variant="contained"
+              size="small"
+              sx={{
+                maxWidth: "150px",
+              }}
+              onClick={() => handleQuitLobby(lobby.id)}
+            >
+              Quit lobby
+            </Button>
+          </Box>
+        );
+      }
+
+      return (
+        <Box key={lobby.id} sx={styles.lobbyContainer}>
+          <Typography fontWeight={"bold"}>{lobby.id}</Typography>
+          <Typography>
+            Players: {lobby.players.length}/{lobby.maxPlayers}
+          </Typography>
+          <Typography>MaxScore: {lobby.maxScore}</Typography>
+          <Button
+            variant="contained"
+            size="small"
+            sx={{
+              maxWidth: "150px",
+            }}
+            onClick={() => handleJoinLobby(lobby.id)}
+          >
+            Join lobby
+          </Button>
+        </Box>
+      );
+    });
   };
 
   const renderGames = () => {
@@ -79,15 +146,49 @@ const HomeView = () => {
     return (
       <Box mt={4}>
         <Typography fontWeight={"bold"}>Ongoing games:</Typography>
-        {games.map((game) => (
-          <Box key={game.id} sx={styles.gameContainer}>
-            <Typography fontWeight={"bold"}>{game.id}</Typography>
-            <Typography>Players: {game.players.length}</Typography>
-          </Box>
-        ))}
+        {games.map((game) => {
+          const isMyGame = myGames?.find((myGame) => myGame.id === game.id);
+
+          if (isMyGame) {
+            return (
+              <Box key={game.id} sx={styles.gameContainer}>
+                <Typography fontWeight={"bold"}>{game.id}</Typography>
+                <Typography>Players: {game.players.length}</Typography>
+                <Button
+                  variant="contained"
+                  size="small"
+                  sx={{
+                    maxWidth: "150px",
+                  }}
+                  onClick={() => handleRejoinGame(game.id)}
+                >
+                  Enter Game
+                </Button>
+              </Box>
+            );
+          }
+
+          return (
+            <Box key={game.id} sx={styles.gameContainer}>
+              <Typography fontWeight={"bold"}>{game.id}</Typography>
+              <Typography>Players: {game.players.length}</Typography>
+            </Box>
+          );
+        })}
       </Box>
     );
   };
+
+  if (currentGameState) {
+    return (
+      <Layout>
+        <GameLayout
+          state={currentGameState}
+          onQuit={() => console.log("QUIT GAME")}
+        />
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
