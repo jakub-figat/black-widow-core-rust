@@ -95,6 +95,7 @@ impl GameStep<CardExchangeState> {
             current_player: self.player_to_player_map.get(&player).unwrap().to_string(),
             table_suit: Some(Club),
             cards_on_table: HashMap::from([(player, starting_card)]),
+            round_score: HashMap::new(),
         };
 
         GameStep {

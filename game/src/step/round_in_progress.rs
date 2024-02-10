@@ -80,6 +80,12 @@ impl GameStep<RoundInProgressState> {
         let score = self.get_total_score_of_cards_on_table();
 
         *self.scores.entry(scoring_player.clone()).or_insert(0) += score;
+        *self
+            .state
+            .round_score
+            .entry(scoring_player.clone())
+            .or_insert(0) += score;
+
         self.state.cards_on_table = HashMap::new();
         self.state.table_suit = None;
         self.state.current_player = scoring_player;
@@ -134,7 +140,21 @@ impl GameStep<RoundInProgressState> {
         self.player_decks.iter().all(|(_, cards)| cards.is_empty())
     }
 
-    pub fn to_round_finished(self) -> GameStep<RoundFinishedState> {
+    pub fn to_round_finished(mut self) -> GameStep<RoundFinishedState> {
+        if let Some((all_scorer, _)) = self
+            .state
+            .round_score
+            .iter()
+            .find(|(_, &score)| score == 43)
+        {
+            for (player, score) in self.scores.iter_mut() {
+                match player == all_scorer {
+                    true => *score -= 43,
+                    false => *score += 43,
+                }
+            }
+        }
+
         GameStep {
             players: self.players,
             player_to_player_map: self.player_to_player_map,
@@ -152,6 +172,7 @@ pub struct RoundInProgressState {
     pub current_player: String,
     pub table_suit: Option<CardSuit>,
     pub cards_on_table: HashMap<String, Card>,
+    pub round_score: HashMap<String, usize>,
 }
 
 #[cfg(test)]
@@ -181,6 +202,7 @@ mod tests {
                 current_player: players[0].clone(),
                 table_suit: None,
                 cards_on_table: HashMap::new(),
+                round_score: HashMap::new(),
             },
         }
     }

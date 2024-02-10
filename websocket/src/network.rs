@@ -34,12 +34,20 @@ pub(crate) async fn broadcast_game_to_players_or_break(
 ) -> Result<(), String> {
     let player_connections = state.player_connections.read().await;
     for player in &game.players {
-        let mut sender = player_connections.get(player).unwrap().clone();
-        send_text(
-            &get_obfuscated_game_details_json(id, game, player),
-            &mut sender,
-        )
-        .await?
+        match player_connections.get(player).cloned() {
+            Some(mut sender) => {
+                send_text(
+                    &get_obfuscated_game_details_json(id, game, player),
+                    &mut sender,
+                )
+                .await?
+            }
+            None => tracing::warn!(
+                "Tried to send game with id {} to disconnected player {}",
+                id,
+                player
+            ),
+        }
     }
     Ok(())
 }

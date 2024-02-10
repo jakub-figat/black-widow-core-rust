@@ -24,6 +24,8 @@ pub enum WebSocketResponse {
     LobbyDeleted(IdResponse),
     #[serde(rename = "gameList")]
     GameList(GameListResponse),
+    #[serde(rename = "gameCreated")]
+    GameCreated(ListedGame),
     #[serde(rename = "gameDetailsCardExchange")]
     GameDetailsCardExchange(GameDetailsResponse<CardExchangeState>),
     #[serde(rename = "gameDetailsRoundInProgress")]

@@ -97,10 +97,10 @@ pub(crate) async fn join_lobby(
         .map_err(SenderError)?;
 
         broadcast_text(
-            &ListedGame {
+            &GameCreated(ListedGame {
                 id: game_id.clone(),
                 players: game.players.clone(),
-            }
+            })
             .to_json(),
             broadcast_sender,
         )
