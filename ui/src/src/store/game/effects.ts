@@ -95,7 +95,38 @@ const handleGameEvent = (message: MessageEvent) => {
         );
 
         if (!lobbyToUpdate) {
-          console.error("Lobby not found", serializedMessage.id);
+          dispatch(
+            setLobbies([
+              ...currentLobbies,
+              { ...serializedMessage.lobby, id: serializedMessage.id },
+            ])
+          );
+
+          const myCurrentLobbies = getState().game.myLobbies;
+          const isNewLobbyMine = serializedMessage.lobby.players.find(
+            (player) => player === `user=${getState().auth.username}`
+          );
+
+          if (!isNewLobbyMine) {
+            return;
+          }
+
+          if (!myCurrentLobbies) {
+            dispatch(
+              setMyLobbies([
+                { ...serializedMessage.lobby, id: serializedMessage.id },
+              ])
+            );
+            return;
+          }
+
+          dispatch(
+            setMyLobbies([
+              ...myCurrentLobbies,
+              { ...serializedMessage.lobby, id: serializedMessage.id },
+            ])
+          );
+
           return;
         }
 
@@ -125,6 +156,17 @@ const handleGameEvent = (message: MessageEvent) => {
 
         break;
 
+      case "LobbyDeleted":
+        const currentLobbiesAfterDelete = getState().game.lobbies?.filter(
+          (lobby) => lobby.id !== serializedMessage.id
+        );
+        const myCurrentLobbiesAfterDelete = getState().game.myLobbies?.filter(
+          (lobby) => lobby.id !== serializedMessage.id
+        );
+
+        dispatch(setLobbies(currentLobbiesAfterDelete || []));
+        dispatch(setMyLobbies(myCurrentLobbiesAfterDelete || []));
+        break;
       default:
         console.error("Unknown message type", serializedMessage.type, message);
         break;

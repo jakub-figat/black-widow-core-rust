@@ -179,6 +179,27 @@ const HomeView = () => {
     );
   };
 
+  const renderCreateLobby = () => {
+    return (
+      <Box sx={styles.lobbyContainer}>
+        <Button
+          variant="contained"
+          size="small"
+          sx={{
+            maxWidth: "150px",
+          }}
+          onClick={() =>
+            dispatch(
+              send({ action: "createLobby", maxPlayers: 3, maxScore: 10 })
+            )
+          }
+        >
+          Create lobby
+        </Button>
+      </Box>
+    );
+  };
+
   if (currentGameState) {
     return (
       <Layout>
@@ -192,6 +213,7 @@ const HomeView = () => {
 
   return (
     <Layout>
+      {renderCreateLobby()}
       {renderLobbies()}
       {renderGames()}
     </Layout>
