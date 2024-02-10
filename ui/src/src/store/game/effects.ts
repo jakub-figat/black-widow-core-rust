@@ -1,7 +1,14 @@
 /* eslint-disable no-case-declarations */
-import { setGames, setLobbies, unitializeGameState } from ".";
+import {
+  setCurrentGame,
+  setGames,
+  setLobbies,
+  setMyGames,
+  setMyLobbies,
+  unitializeGameState,
+} from ".";
 import { WebSocketResponse } from "../../../game-types";
-import { AppDispatch } from "../hooks";
+import { AppDispatch, RootState } from "../hooks";
 import { send } from "../websocket/effects";
 import { IdentifiedLobby } from "./types";
 
@@ -28,7 +35,7 @@ const uninitiaize = () => {
 };
 
 const handleGameEvent = (message: MessageEvent) => {
-  return (dispatch: AppDispatch) => {
+  return (dispatch: AppDispatch, getState: () => RootState) => {
     const serializedMessage = JSON.parse(
       message.data
     ) as WebSocketResponse | null;
@@ -56,11 +63,68 @@ const handleGameEvent = (message: MessageEvent) => {
           ...serializedMessage.lobbies[key],
         }));
 
+        const myLobbies = identifiedLobbies.filter((lobby) =>
+          lobby.players.find(
+            (player) => player === `user=${getState().auth.username}`
+          )
+        );
+
         dispatch(setLobbies(identifiedLobbies));
+        dispatch(setMyLobbies(myLobbies));
         break;
       case "gameList":
+        const myGames = serializedMessage.games.filter((game) =>
+          game.players.find(
+            (player) => player === `user=${getState().auth.username}`
+          )
+        );
+
         dispatch(setGames(serializedMessage.games));
+        dispatch(setMyGames(myGames));
+
         break;
+      case "lobbyDetails":
+        const currentLobbies = getState().game.lobbies;
+        if (!currentLobbies) {
+          console.error("Lobbies not found");
+          return;
+        }
+
+        const lobbyToUpdate = currentLobbies.find(
+          (lobby) => lobby.id === serializedMessage.id
+        );
+
+        if (!lobbyToUpdate) {
+          console.error("Lobby not found", serializedMessage.id);
+          return;
+        }
+
+        const newLobbies = [
+          ...currentLobbies.filter(
+            (lobby) => lobby.id !== serializedMessage.id
+          ),
+          {
+            id: serializedMessage.id,
+            ...serializedMessage.lobby,
+          },
+        ];
+
+        const myNewLobbies = newLobbies.filter((lobby) =>
+          lobby.players.find(
+            (player) => player === `user=${getState().auth.username}`
+          )
+        );
+
+        dispatch(setLobbies(newLobbies));
+        dispatch(setMyLobbies(myNewLobbies));
+
+        break;
+
+      case "gameDetailsCardExchange":
+        dispatch(setCurrentGame(serializedMessage.game));
+
+        break;
+
       default:
         console.error("Unknown message type", serializedMessage.type, message);
         break;

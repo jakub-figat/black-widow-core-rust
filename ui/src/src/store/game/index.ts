@@ -1,18 +1,30 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { PayloadAction, createSlice } from "@reduxjs/toolkit";
-import { ListedGame, ObfuscatedGame } from "../../../game-types";
+import {
+  CardExchangeState,
+  ListedGame,
+  ObfuscatedGame,
+  RoundFinishedState,
+} from "../../../game-types";
 import { IdentifiedLobby } from "./types";
 
 interface GameState {
   games: ListedGame[] | null;
   lobbies: IdentifiedLobby[] | null;
-  currentGame: ObfuscatedGame<any> | null;
+  currentGame:
+    | ObfuscatedGame<CardExchangeState>
+    | ObfuscatedGame<RoundFinishedState>
+    | null;
+  myLobbies: IdentifiedLobby[] | null;
+  myGames: ListedGame[] | null;
 }
 
 const initialState: GameState = {
   games: null,
   lobbies: null,
   currentGame: null,
+  myLobbies: null,
+  myGames: null,
 };
 
 const slice = createSlice({
@@ -36,17 +48,37 @@ const slice = createSlice({
       state.lobbies = null;
       state.games = null;
     },
+    setMyLobbies: (state, action: PayloadAction<GameState["myLobbies"]>) => {
+      state.myLobbies = action.payload;
+    },
+    setMyGames: (state, action: PayloadAction<GameState["myGames"]>) => {
+      state.myGames = action.payload;
+    },
   },
   selectors: {
     getGames: (state: GameState) => state.games,
     getLobbies: (state: GameState) => state.lobbies,
     getCurrentGame: (state: GameState) => state.currentGame,
+    getMyLobbies: (state: GameState) => state.myLobbies,
+    getMyGames: (state: GameState) => state.myGames,
   },
 });
 
-export const { setGames, setCurrentGame, setLobbies, unitializeGameState } =
-  slice.actions;
+export const {
+  setGames,
+  setCurrentGame,
+  setLobbies,
+  unitializeGameState,
+  setMyLobbies,
+  setMyGames,
+} = slice.actions;
 
-export const { getGames, getLobbies, getCurrentGame } = slice.selectors;
+export const {
+  getGames,
+  getLobbies,
+  getCurrentGame,
+  getMyLobbies,
+  getMyGames,
+} = slice.selectors;
 
 export default slice.reducer;
