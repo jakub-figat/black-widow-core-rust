@@ -158,6 +158,8 @@ impl GameStep<RoundInProgressState> {
             }
         }
 
+        println!("{:?}", &self.scores);
+
         GameStep {
             players: self.players,
             player_to_player_map: self.player_to_player_map,
@@ -358,5 +360,42 @@ mod tests {
         assert!(step.state.cards_on_table.is_empty());
         assert!(step.state.table_suit.is_none());
         assert!(step.should_switch());
+    }
+
+    #[test]
+    fn to_round_finished_when_one_player_is_all_scorer() {
+        let players = get_players();
+        let mut step = get_step_from_players(&players);
+        step.scores.insert("1".to_string(), 100);
+        step.scores.insert("2".to_string(), 100);
+        step.scores.insert("3".to_string(), 100);
+
+        step.state.round_score.insert("1".to_string(), 0);
+        step.state.round_score.insert("2".to_string(), 43);
+        step.state.round_score.insert("3".to_string(), 0);
+
+        let round_finished_step = step.to_round_finished();
+        assert_eq!(round_finished_step.scores["1"], 143);
+        assert_eq!(round_finished_step.scores["2"], 57);
+        assert_eq!(round_finished_step.scores["3"], 143);
+    }
+
+    #[test]
+    fn to_round_finished_when_scores_are_distributed() {
+        let players = get_players();
+        let mut step = get_step_from_players(&players);
+        step.scores.insert("1".to_string(), 3);
+        step.scores.insert("2".to_string(), 40);
+        step.scores.insert("3".to_string(), 0);
+
+        step.state.round_score.insert("1".to_string(), 3);
+        step.state.round_score.insert("2".to_string(), 40);
+        step.state.round_score.insert("3".to_string(), 0);
+
+        let round_finished_step = step.to_round_finished();
+
+        assert_eq!(round_finished_step.scores["1"], 3);
+        assert_eq!(round_finished_step.scores["2"], 40);
+        assert_eq!(round_finished_step.scores["3"], 0);
     }
 }

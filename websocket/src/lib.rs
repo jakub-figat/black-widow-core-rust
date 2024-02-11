@@ -16,7 +16,7 @@ use axum::Router;
 use game::Game;
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::sync::{Arc, Mutex as SyncMutex};
+use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
 use tokio::task::JoinHandle;
@@ -52,8 +52,8 @@ struct WebSocketState {
     lobbies: Mutex<HashMap<Uuid, Lobby>>,
     player_connections: RwLock<HashMap<String, mpsc::Sender<Message>>>,
     broadcast_sender: broadcast::Sender<Message>,
-    lobby_timeouts: SyncMutex<HashMap<Uuid, JoinHandle<()>>>,
-    game_timeouts: SyncMutex<HashMap<Uuid, HashMap<String, JoinHandle<()>>>>,
+    lobby_timeouts: Mutex<HashMap<Uuid, JoinHandle<()>>>,
+    game_timeouts: Mutex<HashMap<Uuid, JoinHandle<()>>>,
 }
 
 impl WebSocketState {
@@ -63,8 +63,8 @@ impl WebSocketState {
             lobbies: Mutex::new(HashMap::new()),
             player_connections: RwLock::new(HashMap::new()),
             broadcast_sender: broadcast::channel::<Message>(128).0,
-            lobby_timeouts: SyncMutex::new(HashMap::new()),
-            game_timeouts: SyncMutex::new(HashMap::new()),
+            lobby_timeouts: Mutex::new(HashMap::new()),
+            game_timeouts: Mutex::new(HashMap::new()),
         }
     }
 }

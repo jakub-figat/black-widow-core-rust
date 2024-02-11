@@ -11,7 +11,10 @@ use crate::response::{
     get_obfuscated_game_details_json, GameListResponse, IdResponse, ListedGame,
     LobbyDetailsResponse, LobbyListResponse, ToJson, WebSocketResponse::*,
 };
-use crate::timeout::{cancel_lobby_timeout, schedule_delete_lobby};
+use crate::timeout::{
+    cancel_game_finished_timeout, cancel_lobby_timeout, schedule_delete_finished_game,
+    schedule_delete_lobby,
+};
 use crate::WebSocketState;
 use game::{Card, CardExchange, Game, GameSettings, RoundFinished, RoundInProgress};
 use std::collections::HashSet;
@@ -60,14 +63,13 @@ pub(crate) async fn create_lobby(
     let id = Uuid::new_v4();
 
     lobbies.insert(id.clone(), lobby.clone());
-
     let timeout_handle = tokio::spawn(schedule_delete_lobby(
         id.clone(),
         broadcast_sender.clone(),
         state.clone(),
     ));
     {
-        let mut lobby_timeouts = state.lobby_timeouts.lock().unwrap();
+        let mut lobby_timeouts = state.lobby_timeouts.lock().await;
         lobby_timeouts.insert(id.clone(), timeout_handle);
     }
 
@@ -98,7 +100,7 @@ pub(crate) async fn join_lobby(
 
     if let Some((game_id, game)) = add_player_to_lobby(lobby, player, state.clone()).await {
         lobbies.remove(id);
-        cancel_lobby_timeout(&id, state.clone());
+        cancel_lobby_timeout(&id, state.clone()).await;
 
         broadcast_text(
             &LobbyDeleted(IdResponse { id: id.clone() }).to_json(),
@@ -177,7 +179,7 @@ pub(crate) async fn quit_lobby(
     let response = match remove_player_from_lobby(player, &mut lobby).await {
         Some(_) => {
             lobbies.remove(id);
-            cancel_lobby_timeout(&id, state.clone());
+            cancel_lobby_timeout(&id, state.clone()).await;
             LobbyDeleted(IdResponse { id: id.clone() }).to_json()
         }
         None => LobbyDetails(LobbyDetailsResponse {
@@ -359,14 +361,30 @@ pub(crate) async fn quit_game(
     // forcefully finish game if the player quits during it
     match remove_player_from_game(player, &mut game).await {
         Some(_) => {
+            cancel_game_finished_timeout(id, state.clone()).await;
             games.remove(id);
 
             let response = GameDeleted(IdResponse { id: id.clone() }).to_json();
             broadcast_text(&response, broadcast_sender).map_err(SenderError)
         }
-        None => broadcast_game_to_players(id, &game, state.clone())
-            .await
-            .map_err(SenderError),
+        None => {
+            {
+                let mut game_timeouts = state.game_timeouts.lock().await;
+                if game_timeouts.get(id).is_none() {
+                    game_timeouts.insert(
+                        id.clone(),
+                        tokio::spawn(schedule_delete_finished_game(
+                            id.clone(),
+                            broadcast_sender.clone(),
+                            state.clone(),
+                        )),
+                    );
+                }
+            }
+            broadcast_game_to_players(id, &game, state.clone())
+                .await
+                .map_err(SenderError)
+        }
     }
 }
 
